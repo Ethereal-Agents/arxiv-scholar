@@ -1,0 +1,6 @@
+.venv/
+trial_batch/
+arxiv_batch/
+*_state.json
+__pycache__/
+.DS_Store
