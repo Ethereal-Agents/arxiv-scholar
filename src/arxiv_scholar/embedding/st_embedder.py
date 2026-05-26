@@ -15,6 +15,7 @@ from arxiv_scholar.embedding.base import BaseEmbedder
 logger = logging.getLogger(__name__)
 
 
+
 def _resolve_device(requested: str = "auto") -> str:
     """Determines the best available compute device for PyTorch inference.
 

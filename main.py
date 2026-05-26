@@ -7,7 +7,7 @@ from arxiv_scholar.download.arxiv_ingestion import ArxivUnifiedEngine
 from arxiv_scholar.ingestion.local import LocalDirectoryReader
 from arxiv_scholar.chunking.layout import LayoutAwareChunker
 from arxiv_scholar.embedding.st_embedder import SentenceTransformerEmbedder
-from arxiv_scholar.embedding.fastembed_embedder import FastEmbedEmbedder
+from arxiv_scholar.embedding.fastembed_embedder import FastEmbedEmbedder, SparseBM25Embedder
 from arxiv_scholar.storage.qdrant_store import QdrantVectorStore
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -26,7 +26,7 @@ class PipelineOrchestrator:
         config.STATE_FILE = state_file
         
         self.engine = ArxivUnifiedEngine()
-        self.chunker = LayoutAwareChunker(max_chunk_size=1500)
+        self.chunker = LayoutAwareChunker(max_chunk_size=2000)
         
         if config.EMBEDDING_BACKEND == "fastembed":
             self.embedder = FastEmbedEmbedder(
@@ -41,12 +41,20 @@ class PipelineOrchestrator:
                 batch_size=config.EMBEDDING_BATCH_SIZE,
             )
 
+        self.sparse_embedder = SparseBM25Embedder(batch_size=config.EMBEDDING_BATCH_SIZE)
+
         # Storage
-        self.store = QdrantVectorStore(
-            collection_name=config.QDRANT_COLLECTION,
-            host=config.QDRANT_HOST,
-            port=config.QDRANT_PORT,
-        )
+        if download_dir == "trial_batch":
+            self.store = QdrantVectorStore(
+                collection_name=config.QDRANT_COLLECTION,
+                location=":memory:",
+            )
+        else:
+            self.store = QdrantVectorStore(
+                collection_name=config.QDRANT_COLLECTION,
+                host=config.QDRANT_HOST,
+                port=config.QDRANT_PORT,
+            )
         self.store.ensure_collection(dimension=self.embedder.dimension)
 
     def process_batch(self, batch_size: int = 50) -> bool:
@@ -75,6 +83,7 @@ class PipelineOrchestrator:
             if chunks:
                 texts = [chunk.content for chunk in chunks]
                 vectors = self.embedder.embed(texts)
+                sparse_vectors = self.sparse_embedder.embed(texts)
                 total_embedded += len(vectors)
                 logger.info(
                     f"  Embedded {len(vectors)} chunks "
@@ -82,7 +91,7 @@ class PipelineOrchestrator:
                 )
 
                 # Storage phase — upsert into Qdrant
-                upserted = self.store.upsert(chunks, vectors)
+                upserted = self.store.upsert(chunks, vectors, sparse_vectors=sparse_vectors)
                 logger.info(f"  Stored {upserted} points in Qdrant.")
 
         logger.info(

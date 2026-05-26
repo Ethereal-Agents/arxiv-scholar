@@ -15,7 +15,7 @@ NOT recommended for:
 """
 
 import logging
-from typing import List
+from typing import List, Any
 
 from arxiv_scholar.embedding.base import BaseEmbedder
 
@@ -87,3 +87,28 @@ class FastEmbedEmbedder(BaseEmbedder):
     def model_name(self) -> str:
         """Returns the model identifier."""
         return self._model_name
+
+
+class SparseBM25Embedder:
+    """Embedding backend for BM25 sparse vectors using FastEmbed."""
+
+    def __init__(self, model_name: str = "Qdrant/bm25", batch_size: int = 256) -> None:
+        self._model_name = model_name
+        self._batch_size = batch_size
+        try:
+            from fastembed import SparseTextEmbedding
+            logger.info(f"Loading FastEmbed sparse model '{model_name}'...")
+            self._model = SparseTextEmbedding(model_name)
+        except ImportError:
+            raise ImportError(
+                "fastembed is not installed. "
+                "Please run: pip install fastembed"
+            )
+
+    def embed(self, texts: List[str]) -> List[Any]:
+        """Encodes texts into sparse vectors.
+        Returns a list of SparseEmbedding objects which have .indices and .values.
+        """
+        if not texts:
+            return []
+        return list(self._model.embed(texts, batch_size=self._batch_size))
