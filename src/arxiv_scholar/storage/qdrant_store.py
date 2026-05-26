@@ -13,6 +13,8 @@ from qdrant_client.models import (
     Distance,
     PointStruct,
     VectorParams,
+    SparseVectorParams,
+    SparseVector,
 )
 
 from arxiv_scholar.schema import Chunk
@@ -74,6 +76,9 @@ class QdrantVectorStore(BaseVectorStore):
                 size=dimension,
                 distance=Distance.COSINE,
             ),
+            sparse_vectors_config={
+                "bm25": SparseVectorParams()
+            },
         )
         logger.info(
             "Created collection '%s' (dim=%d, distance=COSINE).",
@@ -84,32 +89,47 @@ class QdrantVectorStore(BaseVectorStore):
         self,
         chunks: List[Chunk],
         vectors: List[List[float]],
+        sparse_vectors: Optional[List[Any]] = None,
     ) -> int:
         """Upsert chunks and their vectors into the collection.
 
         Each point stores:
           - id:      a deterministic UUID derived from the chunk's own id
-          - vector:  the dense embedding
+          - vector:  the dense embedding (and optionally bm25 sparse vector)
           - payload: {"content", "document_id", "metadata"}
         """
         if len(chunks) != len(vectors):
             raise ValueError(
                 f"Mismatch: {len(chunks)} chunks vs {len(vectors)} vectors."
             )
-
-        points = [
-            PointStruct(
-                id=self._stable_uuid(chunk.id),
-                vector=vector,
-                payload={
-                    "chunk_id": chunk.id,
-                    "document_id": chunk.document_id,
-                    "content": chunk.content,
-                    "metadata": chunk.metadata,
-                },
+        if sparse_vectors and len(sparse_vectors) != len(chunks):
+            raise ValueError(
+                f"Mismatch: {len(chunks)} chunks vs {len(sparse_vectors)} sparse vectors."
             )
-            for chunk, vector in zip(chunks, vectors)
-        ]
+
+        points = []
+        for i, (chunk, vector) in enumerate(zip(chunks, vectors)):
+            if sparse_vectors:
+                sv = sparse_vectors[i]
+                point_vector = {
+                    "": vector,
+                    "bm25": SparseVector(indices=sv.indices, values=sv.values)
+                }
+            else:
+                point_vector = vector
+
+            points.append(
+                PointStruct(
+                    id=self._stable_uuid(chunk.id),
+                    vector=point_vector,
+                    payload={
+                        "chunk_id": chunk.id,
+                        "document_id": chunk.document_id,
+                        "content": chunk.content,
+                        "metadata": chunk.metadata,
+                    },
+                )
+            )
 
         self._client.upsert(
             collection_name=self.collection_name,
