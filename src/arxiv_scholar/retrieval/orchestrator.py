@@ -4,8 +4,7 @@ import json
 import asyncio
 import logging
 from typing import Any, Dict, List
-import openai
-from openai import OpenAI
+from arxiv_scholar.llm.service import LLMService
 
 from qdrant_client import QdrantClient
 from qdrant_client.models import Prefetch, FusionQuery, Fusion, SparseVector
@@ -16,7 +15,7 @@ from arxiv_scholar.retrieval.router import Route, route_query, MLQueryRouter
 
 logger = logging.getLogger(__name__)
 
-class AdvancedRetriever:
+class Orchestrator:
     def __init__(
         self,
         collection_name: str,
@@ -39,16 +38,15 @@ class AdvancedRetriever:
         # Initialize ML router
         self.router = MLQueryRouter()
         
-        api_key = os.environ.get("OPENROUTER_API_KEY", "")
-        self.llm_client = OpenAI(
-            base_url="https://openrouter.ai/api/v1",
-            api_key=api_key
-        ) if api_key else None
+        # Initialize LLM Service
+        self.llm_service = LLMService()
 
     async def retrieve(self, query: str, limit: int = 20, use_reranker: bool = False) -> List[Dict[str, Any]]:
+        logger.info(f"Orchestrator.retrieve called with query: '{query}', limit={limit}, use_reranker={use_reranker}")
         # Compute dense embedding to feed to the ML router
         dense_vec = list(self.dense_model.embed([query]))[0].tolist()
         route = self.router.route(query, query_vector=dense_vec)
+        logger.info(f"Router selected route: {route.name}")
         # Note: In a real system, we'd return the route to log the prometheus path metric
         # We will attach the path to the returned payload for benchmarking scripts to read
         
@@ -57,7 +55,7 @@ class AdvancedRetriever:
         elif route == Route.DECOMPOSE:
             results = await self._execute_decompose(query, limit, use_reranker)
         elif route == Route.HYDE:
-            if not self.llm_client:
+            if not self.llm_service.client:
                 results = await self._execute_direct(query, limit, use_reranker)
             else:
                 results = await self._execute_hyde(query, limit, use_reranker)
@@ -79,6 +77,7 @@ class AdvancedRetriever:
         sparse_vec = list(self.sparse_model.embed([query]))[0]
         
         fetch_limit = limit * 5 if (use_reranker and self.reranker_model) else limit
+        logger.debug(f"Executing Qdrant hybrid search for query: '{query}', limit={limit}, fetch_limit={fetch_limit}")
 
         # Qdrant networking
         response = self.qdrant_client.query_points(
@@ -100,74 +99,27 @@ class AdvancedRetriever:
         points = await asyncio.to_thread(self._hybrid_search_sync, query, limit, None, use_reranker)
         return await asyncio.to_thread(self._format_results, points, query, limit, use_reranker)
 
-    def _generate_hyde_sync(self, query: str) -> str:
-        prompt = f"""
-        Please write a brief academic abstract that directly answers the following query. 
-        Do not use conversational filler, just write the abstract.
-        Query: {query}
-        """
-        response = self.llm_client.chat.completions.create(
-            model="anthropic/claude-3.5-haiku",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.3
-        )
-        return response.choices[0].message.content
-
     async def _execute_hyde(self, query: str, limit: int = 20, use_reranker: bool = False) -> List[Dict[str, Any]]:
         # 1. Generate hypothetical abstract via API
-        abstract = await asyncio.to_thread(self._generate_hyde_sync, query)
+        abstract = await self.llm_service.generate_hyde_abstract(query)
+        logger.info(f"Generated HyDE abstract: '{abstract[:100]}...'")
         
         # 2. Hybrid search (Dense uses abstract, Sparse uses original query)
         points = await asyncio.to_thread(self._hybrid_search_sync, query, limit, abstract, use_reranker)
         return await asyncio.to_thread(self._format_results, points, query, limit, use_reranker)
 
-    def _generate_decomposition_sync(self, query: str) -> List[str]:
-        prompt = f"""
-        Decompose this query into independent, fully contextualized sub-queries. 
-        Each sub-query must be able to stand completely on its own for a search engine.
-        For example: "Accuracy of BERT vs GPT-3" -> ["What is the accuracy of BERT?", "What is the accuracy of GPT-3?"]
-        
-        Query: {query}
-        
-        Return ONLY valid JSON in this exact format:
-        {{
-            "sub_queries": ["sub query 1", "sub query 2"]
-        }}
-        """
-        response = self.llm_client.chat.completions.create(
-            model="anthropic/claude-3.5-haiku",
-            messages=[{"role": "user", "content": prompt}],
-            response_format={"type": "json_object"},
-            temperature=0.1
-        )
-        content = response.choices[0].message.content.strip()
-        
-        # Safely strip markdown formatting if the model included it despite the json_object constraint
-        if content.startswith("```json"):
-            content = content[7:]
-        if content.startswith("```"):
-            content = content[3:]
-        if content.endswith("```"):
-            content = content[:-3]
-        content = content.strip()
-        
-        try:
-            data = json.loads(content)
-            return data.get("sub_queries", [query])
-        except Exception as e:
-            logger.error(f"Failed to parse LLM JSON for decomposition: {e} | Content: {content}")
-            return [query]
-
     async def _execute_decompose(self, query: str, limit: int = 20, use_reranker: bool = False) -> List[Dict[str, Any]]:
-        if not self.llm_client:
+        if not self.llm_service.client:
             logger.warning("No LLM client configured for DECOMPOSE. Falling back to DIRECT.")
             return await self._execute_direct(query, limit, use_reranker)
             
         # 1. Generate fully contextualized sub-queries via LLM
-        sub_queries = await asyncio.to_thread(self._generate_decomposition_sync, query)
+        sub_queries = await self.llm_service.decompose_query(query)
         
         if not sub_queries:
             sub_queries = [query]
+            
+        logger.info(f"Decomposed into {len(sub_queries)} sub-queries: {sub_queries}")
             
         # 2. Fire concurrent searches for each sub-query
         tasks = [self._execute_direct(sq, limit, use_reranker) for sq in sub_queries]
@@ -197,6 +149,7 @@ class AdvancedRetriever:
             })
             
         if use_reranker and self.reranker_model and results and query_text:
+            logger.debug(f"Applying cross-encoder reranking for {len(results)} chunks")
             documents = [res["text"][:500] for res in results]
             cross_scores = list(self.reranker_model.rerank(query_text, documents))
             
