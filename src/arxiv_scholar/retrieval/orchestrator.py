@@ -10,8 +10,9 @@ from openai import OpenAI
 from qdrant_client import QdrantClient
 from qdrant_client.models import Prefetch, FusionQuery, Fusion, SparseVector
 from fastembed import TextEmbedding, SparseTextEmbedding
+from fastembed.rerank.cross_encoder import TextCrossEncoder
 
-from arxiv_scholar.retrieval.router import Route, route_query
+from arxiv_scholar.retrieval.router import Route, route_query, MLQueryRouter
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +24,7 @@ class AdvancedRetriever:
         qdrant_port: int = 6333,
         dense_model_name: str = "BAAI/bge-small-en-v1.5",
         sparse_model_name: str = "Qdrant/bm25",
+        reranker_model_name: str = None,
     ):
         self.collection_name = collection_name
         self.qdrant_client = QdrantClient(host=qdrant_host, port=qdrant_port)
@@ -30,28 +32,37 @@ class AdvancedRetriever:
         self.dense_model = TextEmbedding(model_name=dense_model_name)
         self.sparse_model = SparseTextEmbedding(model_name=sparse_model_name)
         
+        self.reranker_model = None
+        if reranker_model_name:
+            self.reranker_model = TextCrossEncoder(model_name=reranker_model_name)
+        
+        # Initialize ML router
+        self.router = MLQueryRouter()
+        
         api_key = os.environ.get("OPENROUTER_API_KEY", "")
         self.llm_client = OpenAI(
             base_url="https://openrouter.ai/api/v1",
             api_key=api_key
         ) if api_key else None
 
-    async def retrieve(self, query: str, limit: int = 20) -> List[Dict[str, Any]]:
-        route = route_query(query)
+    async def retrieve(self, query: str, limit: int = 20, use_reranker: bool = False) -> List[Dict[str, Any]]:
+        # Compute dense embedding to feed to the ML router
+        dense_vec = list(self.dense_model.embed([query]))[0].tolist()
+        route = self.router.route(query, query_vector=dense_vec)
         # Note: In a real system, we'd return the route to log the prometheus path metric
         # We will attach the path to the returned payload for benchmarking scripts to read
         
         if route == Route.DIRECT:
-            results = await self._execute_direct(query, limit)
+            results = await self._execute_direct(query, limit, use_reranker)
         elif route == Route.DECOMPOSE:
-            results = await self._execute_decompose(query, limit)
+            results = await self._execute_decompose(query, limit, use_reranker)
         elif route == Route.HYDE:
             if not self.llm_client:
-                results = await self._execute_direct(query, limit)
+                results = await self._execute_direct(query, limit, use_reranker)
             else:
-                results = await self._execute_hyde(query, limit)
+                results = await self._execute_hyde(query, limit, use_reranker)
         else:
-            results = await self._execute_direct(query, limit)
+            results = await self._execute_direct(query, limit, use_reranker)
             
         # Attach route metadata so benchmark can track it
         for r in results:
@@ -59,33 +70,35 @@ class AdvancedRetriever:
             
         return results
 
-    def _hybrid_search_sync(self, query: str, limit: int = 20, dense_query: str = None) -> List[Any]:
+    def _hybrid_search_sync(self, query: str, limit: int = 20, dense_query: str = None, use_reranker: bool = False) -> List[Any]:
         # dense_query can be the generated abstract for HyDE
         dq = dense_query if dense_query else query
         
         # FastEmbed operations are synchronous and CPU bound
         dense_vec = list(self.dense_model.embed([dq]))[0].tolist()
         sparse_vec = list(self.sparse_model.embed([query]))[0]
+        
+        fetch_limit = limit * 5 if (use_reranker and self.reranker_model) else limit
 
         # Qdrant networking
         response = self.qdrant_client.query_points(
             collection_name=self.collection_name,
             prefetch=[
-                Prefetch(query=dense_vec, using="", limit=limit*2),
+                Prefetch(query=dense_vec, using="", limit=fetch_limit),
                 Prefetch(
                     query=SparseVector(indices=sparse_vec.indices, values=sparse_vec.values),
                     using="bm25",
-                    limit=limit*2,
+                    limit=fetch_limit,
                 ),
             ],
             query=FusionQuery(fusion=Fusion.RRF),
-            limit=limit,
+            limit=fetch_limit,
         )
         return response.points
 
-    async def _execute_direct(self, query: str, limit: int = 20) -> List[Dict[str, Any]]:
-        points = await asyncio.to_thread(self._hybrid_search_sync, query, limit)
-        return self._format_results(points)
+    async def _execute_direct(self, query: str, limit: int = 20, use_reranker: bool = False) -> List[Dict[str, Any]]:
+        points = await asyncio.to_thread(self._hybrid_search_sync, query, limit, None, use_reranker)
+        return await asyncio.to_thread(self._format_results, points, query, limit, use_reranker)
 
     def _generate_hyde_sync(self, query: str) -> str:
         prompt = f"""
@@ -100,13 +113,13 @@ class AdvancedRetriever:
         )
         return response.choices[0].message.content
 
-    async def _execute_hyde(self, query: str, limit: int = 20) -> List[Dict[str, Any]]:
+    async def _execute_hyde(self, query: str, limit: int = 20, use_reranker: bool = False) -> List[Dict[str, Any]]:
         # 1. Generate hypothetical abstract via API
         abstract = await asyncio.to_thread(self._generate_hyde_sync, query)
         
         # 2. Hybrid search (Dense uses abstract, Sparse uses original query)
-        points = await asyncio.to_thread(self._hybrid_search_sync, query, limit, abstract)
-        return self._format_results(points)
+        points = await asyncio.to_thread(self._hybrid_search_sync, query, limit, abstract, use_reranker)
+        return await asyncio.to_thread(self._format_results, points, query, limit, use_reranker)
 
     def _generate_decomposition_sync(self, query: str) -> List[str]:
         prompt = f"""
@@ -145,10 +158,10 @@ class AdvancedRetriever:
             logger.error(f"Failed to parse LLM JSON for decomposition: {e} | Content: {content}")
             return [query]
 
-    async def _execute_decompose(self, query: str, limit: int = 20) -> List[Dict[str, Any]]:
+    async def _execute_decompose(self, query: str, limit: int = 20, use_reranker: bool = False) -> List[Dict[str, Any]]:
         if not self.llm_client:
             logger.warning("No LLM client configured for DECOMPOSE. Falling back to DIRECT.")
-            return await self._execute_direct(query, limit)
+            return await self._execute_direct(query, limit, use_reranker)
             
         # 1. Generate fully contextualized sub-queries via LLM
         sub_queries = await asyncio.to_thread(self._generate_decomposition_sync, query)
@@ -157,7 +170,7 @@ class AdvancedRetriever:
             sub_queries = [query]
             
         # 2. Fire concurrent searches for each sub-query
-        tasks = [self._execute_direct(sq, limit) for sq in sub_queries]
+        tasks = [self._execute_direct(sq, limit, use_reranker) for sq in sub_queries]
         results_lists = await asyncio.gather(*tasks)
         
         # 3. Merge and deduplicate interface
@@ -169,9 +182,10 @@ class AdvancedRetriever:
                     seen.add(r["chunk_id"])
                     all_results.append(r)
                     
+        all_results = sorted(all_results, key=lambda x: x["score"], reverse=True)
         return all_results[:limit]
 
-    def _format_results(self, points: List[Any]) -> List[Dict[str, Any]]:
+    def _format_results(self, points: List[Any], query_text: str = None, limit: int = 20, use_reranker: bool = False) -> List[Dict[str, Any]]:
         results = []
         for point in points:
             payload = point.payload or {}
@@ -181,4 +195,14 @@ class AdvancedRetriever:
                 "score": point.score,
                 "metadata": payload.get("metadata", {}),
             })
-        return results
+            
+        if use_reranker and self.reranker_model and results and query_text:
+            documents = [res["text"][:500] for res in results]
+            cross_scores = list(self.reranker_model.rerank(query_text, documents))
+            
+            for i, res in enumerate(results):
+                res["score"] = float(cross_scores[i])
+                
+            results = sorted(results, key=lambda x: x["score"], reverse=True)
+            
+        return results[:limit]
