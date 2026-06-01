@@ -119,6 +119,11 @@ class LocalDirectoryReader(DocumentReader):
                 arxiv_id = self._extract_arxiv_id(text_content, file_path.name)
                 if arxiv_id:
                     metadata["arxiv_id"] = arxiv_id
+                    
+                    year_match = re.search(r'(?:/|^)(\d{2})(?:0[1-9]|1[0-2])\d{3,5}', arxiv_id)
+                    if year_match:
+                        yy = int(year_match.group(1))
+                        metadata["year"] = 1900 + yy if yy >= 91 else 2000 + yy
 
                 yield Document(
                     id=doc_id,

@@ -13,6 +13,10 @@ GCS_BASE_PREFIX = os.getenv("GCS_BASE_PREFIX", "arxiv/arxiv/pdf/")
 # Embedding configuration
 EMBEDDING_BACKEND = os.getenv("EMBEDDING_BACKEND", "sentence-transformers")
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "BAAI/bge-small-en-v1.5")
+SPARSE_EMBEDDING_MODEL = os.getenv("SPARSE_EMBEDDING_MODEL", "Qdrant/bm25")
+RERANKER_MODEL = os.getenv("RERANKER_MODEL", "BAAI/bge-reranker-base")
+RERANKER_TRUNCATION_LENGTH = int(os.getenv("RERANKER_TRUNCATION_LENGTH", "2000"))
+RERANKER_FETCH_MULTIPLIER = int(os.getenv("RERANKER_FETCH_MULTIPLIER", "5"))
 EMBEDDING_BATCH_SIZE = int(os.getenv("EMBEDDING_BATCH_SIZE", "32"))
 EMBEDDING_DEVICE = os.getenv("EMBEDDING_DEVICE", "auto")
 

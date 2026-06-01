@@ -135,7 +135,14 @@ class GCSBucketReader(DocumentReader):
                     match = ARXIV_ID_REGEX.search(content[:2000])
 
                 if match:
-                    metadata["arxiv_id"] = match.group(1)
+                    arxiv_id = match.group(1)
+                    metadata["arxiv_id"] = arxiv_id
+                    
+                    import re
+                    year_match = re.search(r'(?:/|^)(\d{2})(?:0[1-9]|1[0-2])\d{3,5}', arxiv_id)
+                    if year_match:
+                        yy = int(year_match.group(1))
+                        metadata["year"] = 1900 + yy if yy >= 91 else 2000 + yy
 
                 yield Document(
                     id=doc_id,
