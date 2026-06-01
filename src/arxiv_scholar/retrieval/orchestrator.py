@@ -16,6 +16,7 @@ from configs.config import (
     SPARSE_EMBEDDING_MODEL,
     RERANKER_MODEL,
     RERANKER_FETCH_MULTIPLIER,
+    USE_RERANKER,
 )
 
 logger = logging.getLogger(__name__)
@@ -47,7 +48,7 @@ class Orchestrator:
         # Initialize LLM Service
         self.llm_service = LLMService()
 
-    async def retrieve(self, query: str, limit: int = 20, use_reranker: bool = False) -> List[Dict[str, Any]]:
+    async def retrieve(self, query: str, limit: int = 20, use_reranker: bool = USE_RERANKER) -> List[Dict[str, Any]]:
         logger.info(f"Orchestrator.retrieve called with query: '{query}', limit={limit}, use_reranker={use_reranker}")
         # Compute dense embedding to feed to the ML router
         dense_vec = list(self.retriever.dense_model.embed([query]))[0].tolist()
@@ -74,10 +75,10 @@ class Orchestrator:
             
         return results
 
-    async def _execute_direct(self, query: str, limit: int = 20, use_reranker: bool = False, filters: Dict[str, Any] = None) -> List[Dict[str, Any]]:
+    async def _execute_direct(self, query: str, limit: int = 20, use_reranker: bool = USE_RERANKER, filters: Dict[str, Any] = None) -> List[Dict[str, Any]]:
         return await asyncio.to_thread(self.retriever.retrieve, query, limit, use_reranker, None, filters)
 
-    async def _execute_hyde(self, query: str, limit: int = 20, use_reranker: bool = False) -> List[Dict[str, Any]]:
+    async def _execute_hyde(self, query: str, limit: int = 20, use_reranker: bool = USE_RERANKER) -> List[Dict[str, Any]]:
         # 1. Generate hypothetical abstract via API
         abstract = await self.llm_service.generate_hyde_abstract(query)
         logger.info(f"Generated HyDE abstract: '{abstract[:100]}...'")
@@ -85,7 +86,7 @@ class Orchestrator:
         # 2. Hybrid search (Dense uses abstract, Sparse uses original query)
         return await asyncio.to_thread(self.retriever.retrieve, query, limit, use_reranker, abstract)
 
-    async def _execute_decompose(self, query: str, limit: int = 20, use_reranker: bool = False) -> List[Dict[str, Any]]:
+    async def _execute_decompose(self, query: str, limit: int = 20, use_reranker: bool = USE_RERANKER) -> List[Dict[str, Any]]:
         if not self.llm_service.client:
             logger.warning("No LLM client configured for DECOMPOSE. Falling back to DIRECT.")
             return await self._execute_direct(query, limit, use_reranker)

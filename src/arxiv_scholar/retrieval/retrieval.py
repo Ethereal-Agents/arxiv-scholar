@@ -21,6 +21,7 @@ from configs.config import (
     RERANKER_MODEL,
     RERANKER_TRUNCATION_LENGTH,
     RERANKER_FETCH_MULTIPLIER,
+    USE_RERANKER,
 )
 
 logger = logging.getLogger(__name__)
@@ -68,7 +69,7 @@ class HybridRetriever:
             logger.info(f"Loading fastembed reranker model: {reranker_model_name}")
             self.reranker_model = TextCrossEncoder(model_name=reranker_model_name)
 
-    def retrieve(self, query_text: str, limit: int = 20, use_reranker: bool = False, dense_query_text: str = None, filters: Dict[str, Any] = None) -> List[Dict[str, Any]]:
+    def retrieve(self, query_text: str, limit: int = 20, use_reranker: bool = USE_RERANKER, dense_query_text: str = None, filters: Dict[str, Any] = None) -> List[Dict[str, Any]]:
         """Executes a hybrid search query with server-side RRF.
         
         Args:
