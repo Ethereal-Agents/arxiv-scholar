@@ -12,6 +12,17 @@ from qdrant_client import models
 from fastembed import TextEmbedding, SparseTextEmbedding
 from fastembed.rerank.cross_encoder import TextCrossEncoder
 
+from configs.config import (
+    QDRANT_HOST,
+    QDRANT_PORT,
+    QDRANT_COLLECTION,
+    EMBEDDING_MODEL,
+    SPARSE_EMBEDDING_MODEL,
+    RERANKER_MODEL,
+    RERANKER_TRUNCATION_LENGTH,
+    RERANKER_FETCH_MULTIPLIER,
+)
+
 logger = logging.getLogger(__name__)
 
 class HybridRetriever:
@@ -19,13 +30,13 @@ class HybridRetriever:
 
     def __init__(
         self,
-        collection_name: str,
-        qdrant_host: str = "localhost",
-        qdrant_port: int = 6333,
+        collection_name: str = QDRANT_COLLECTION,
+        qdrant_host: str = QDRANT_HOST,
+        qdrant_port: int = QDRANT_PORT,
         location: str = None,
-        dense_model_name: str = "BAAI/bge-small-en-v1.5",
-        sparse_model_name: str = "Qdrant/bm25",
-        reranker_model_name: str = None,
+        dense_model_name: str = EMBEDDING_MODEL,
+        sparse_model_name: str = SPARSE_EMBEDDING_MODEL,
+        reranker_model_name: str = RERANKER_MODEL,
     ) -> None:
         """Initializes the retriever and its global state (models and db client)."""
         self.collection_name = collection_name
@@ -51,19 +62,23 @@ class HybridRetriever:
             logger.info(f"Loading fastembed reranker model: {reranker_model_name}")
             self.reranker_model = TextCrossEncoder(model_name=reranker_model_name)
 
-    def retrieve(self, query_text: str, limit: int = 20, use_reranker: bool = False) -> List[Dict[str, Any]]:
+    def retrieve(self, query_text: str, limit: int = 20, use_reranker: bool = False, dense_query_text: str = None, filters: Dict[str, Any] = None) -> List[Dict[str, Any]]:
         """Executes a hybrid search query with server-side RRF.
         
         Args:
             query_text: The raw natural language query.
             limit: The maximum number of top-K results to return (default 20).
+            use_reranker: Whether to apply cross-encoder reranking.
+            dense_query_text: Optional text to use for the dense embedding (useful for HyDE). Defaults to query_text.
+            filters: Optional dictionary of metadata filters.
             
         Returns:
             A list of dictionaries containing chunk_id, text, score, and metadata.
         """
         # 3. Generate the Dense vector for the query_text.
         # fastembed returns generators, so we consume it into a list and take the first item
-        dense_vector = list(self.dense_model.embed([query_text]))[0].tolist()
+        dq = dense_query_text if dense_query_text else query_text
+        dense_vector = list(self.dense_model.embed([dq]))[0].tolist()
 
         # 4. Generate the Sparse vector for the query_text.
         sparse_result = list(self.sparse_model.embed([query_text]))[0]
@@ -74,21 +89,41 @@ class HybridRetriever:
         )
 
         # 5. The Prefetch Construction
-        # Construct prefetch for the Dense search path
-        # Assuming the dense vector is the unnamed default vector ("") in Qdrant
-        fetch_limit = limit * 5 if (use_reranker and self.reranker_model) else limit
+        qdrant_filter = None
+        if filters:
+            must_conditions = []
+            for key, val_obj in filters.items():
+                if isinstance(val_obj, dict) and "operator" in val_obj and "value" in val_obj:
+                    op = val_obj["operator"]
+                    v = val_obj["value"]
+                    if op == "==":
+                        must_conditions.append(models.FieldCondition(key=f"metadata.{key}", match=models.MatchValue(value=v)))
+                    else:
+                        range_args = {}
+                        if op == ">=": range_args["gte"] = v
+                        elif op == ">": range_args["gt"] = v
+                        elif op == "<=": range_args["lte"] = v
+                        elif op == "<": range_args["lt"] = v
+                        must_conditions.append(models.FieldCondition(key=f"metadata.{key}", range=models.Range(**range_args)))
+                else:
+                    must_conditions.append(models.FieldCondition(key=f"metadata.{key}", match=models.MatchValue(value=val_obj)))
+            
+            if must_conditions:
+                qdrant_filter = models.Filter(must=must_conditions)
+
+        fetch_limit = limit * RERANKER_FETCH_MULTIPLIER if (use_reranker and self.reranker_model) else limit
         prefetch_dense = models.Prefetch(
             query=dense_vector,
             using="",
             limit=fetch_limit,
+            filter=qdrant_filter,
         )
 
-        # Construct prefetch for the Sparse search path
-        # Assuming the sparse vector is named "bm25" or "sparse" in Qdrant (using "bm25" based on earlier ingestion)
         prefetch_sparse = models.Prefetch(
             query=sparse_vector,
             using="bm25",
             limit=fetch_limit,
+            filter=qdrant_filter,
         )
 
         # 6. Database Execution
@@ -114,16 +149,22 @@ class HybridRetriever:
             })
             
         if use_reranker and self.reranker_model and results:
-            # Predict cross-encoder scores
-            # Truncate text to limit ONNX token sequence length for <1s p99 latency
-            documents = [res["text"][:500] for res in results]
-            cross_scores = list(self.reranker_model.rerank(query_text, documents))
-            
-            # Update scores and sort descending
-            for i, res in enumerate(results):
-                res["score"] = float(cross_scores[i])
-                
-            results = sorted(results, key=lambda x: x["score"], reverse=True)
-            results = results[:limit]
+            results = self.rerank_results(query_text, results, limit)
 
         return results
+
+    def rerank_results(self, query_text: str, results: List[Dict[str, Any]], limit: int = 20) -> List[Dict[str, Any]]:
+        """Reranks a list of result chunks against a query using the cross-encoder."""
+        if not self.reranker_model or not results:
+            return results[:limit]
+            
+        # Predict cross-encoder scores
+        documents = [res["text"][:RERANKER_TRUNCATION_LENGTH] for res in results]
+        cross_scores = list(self.reranker_model.rerank(query_text, documents))
+        
+        # Update scores and sort descending
+        for i, res in enumerate(results):
+            res["score"] = float(cross_scores[i])
+            
+        results = sorted(results, key=lambda x: x["score"], reverse=True)
+        return results[:limit]

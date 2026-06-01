@@ -131,7 +131,7 @@ class QdrantVectorStore(BaseVectorStore):
                 )
             )
 
-        self._client.upsert(
+        self._client.upload_points(
             collection_name=self.collection_name,
             points=points,
         )

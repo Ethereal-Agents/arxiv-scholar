@@ -1,8 +1,6 @@
 import time
-import os
 import logging
 from contextlib import asynccontextmanager
-import asyncio
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
@@ -16,13 +14,7 @@ from arxiv_scholar.api.schema import (
     StreamTokenEvent, 
     StreamDoneEvent
 )
-
-# Import config (falling back to localhost if not available)
-try:
-    from configs.config import QDRANT_HOST, QDRANT_PORT
-except ImportError:
-    QDRANT_HOST = "localhost"
-    QDRANT_PORT = 6333
+from configs.config import QDRANT_HOST, QDRANT_PORT, QDRANT_COLLECTION, RERANKER_MODEL
 
 logger = logging.getLogger(__name__)
 
@@ -33,16 +25,16 @@ app_state = {}
 async def lifespan(app: FastAPI):
     # Startup
     logger.info("Initializing Orchestrator with ML Router and BGE Re-ranker...")
-    retriever = Orchestrator(
-        collection_name="arxiv_papers",
+    orchestrator = Orchestrator(
+        collection_name=QDRANT_COLLECTION,
         qdrant_host=QDRANT_HOST,
         qdrant_port=QDRANT_PORT,
-        reranker_model_name="BAAI/bge-reranker-base"
+        reranker_model_name=RERANKER_MODEL
     )
     
     llm_service = LLMService()
     
-    app_state["retriever"] = retriever
+    app_state["orchestrator"] = orchestrator
     app_state["llm_service"] = llm_service
     
     yield
@@ -57,18 +49,18 @@ async def query_endpoint(request: QueryRequest):
     logger.info(f"Received query request: query='{request.query}', limit={request.limit}, rerank={request.use_reranker}")
     start_time = time.perf_counter()
     
-    retriever = app_state.get("retriever")
+    orchestrator = app_state.get("orchestrator")
     llm_service = app_state.get("llm_service")
     
-    if not retriever:
-        raise HTTPException(status_code=500, detail="Retriever not initialized")
+    if not orchestrator:
+        raise HTTPException(status_code=500, detail="Orchestrator not initialized")
         
     async def _stream_response():
         try:
             # 1. Retrieve & Re-rank
             # Orchestrator is natively async, so we await it directly
             logger.debug(f"Starting retrieval for query: '{request.query}'")
-            chunks = await retriever.retrieve(
+            chunks = await orchestrator.retrieve(
                 request.query,
                 limit=request.limit,
                 use_reranker=request.use_reranker

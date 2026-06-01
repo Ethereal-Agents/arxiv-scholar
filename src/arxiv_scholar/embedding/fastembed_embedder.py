@@ -18,6 +18,7 @@ import logging
 from typing import List, Any
 
 from arxiv_scholar.embedding.base import BaseEmbedder
+from configs.config import EMBEDDING_MODEL, SPARSE_EMBEDDING_MODEL, EMBEDDING_BATCH_SIZE
 
 logger = logging.getLogger(__name__)
 
@@ -32,8 +33,8 @@ class FastEmbedEmbedder(BaseEmbedder):
 
     def __init__(
         self,
-        model_name: str = "BAAI/bge-m3",
-        batch_size: int = 256,
+        model_name: str = EMBEDDING_MODEL,
+        batch_size: int = EMBEDDING_BATCH_SIZE,
     ) -> None:
         """Initializes the FastEmbed embedder.
 
@@ -92,7 +93,7 @@ class FastEmbedEmbedder(BaseEmbedder):
 class SparseBM25Embedder:
     """Embedding backend for BM25 sparse vectors using FastEmbed."""
 
-    def __init__(self, model_name: str = "Qdrant/bm25", batch_size: int = 256) -> None:
+    def __init__(self, model_name: str = SPARSE_EMBEDDING_MODEL, batch_size: int = EMBEDDING_BATCH_SIZE) -> None:
         self._model_name = model_name
         self._batch_size = batch_size
         try:

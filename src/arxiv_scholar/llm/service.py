@@ -38,22 +38,35 @@ class LLMService:
         )
         return response.choices[0].message.content
 
-    async def decompose_query(self, query: str) -> List[str]:
+    async def decompose_query(self, query: str) -> Any:
         if not self.client:
             logger.warning("No LLM client configured for DECOMPOSE. Falling back.")
-            return [query]
+            return {"sub_queries": [query]}
             
         prompt = f"""
         Decompose this query into independent, fully contextualized sub-queries. 
         Each sub-query must be able to stand completely on its own for a search engine.
-        For example: "Accuracy of BERT vs GPT-3" -> ["What is the accuracy of BERT?", "What is the accuracy of GPT-3?"]
+        Also, extract any explicit metadata constraints (e.g., year published) into a structured filters object.
+        
+        For example: "Accuracy of BERT vs GPT-3 published after 2022" -> 
+        sub_queries: ["What is the accuracy of BERT?", "What is the accuracy of GPT-3?"]
+        filters: {{"year": {{"operator": ">=", "value": 2022}}}}
+        
+        Valid operators: ">=", ">", "<=", "<", "=="
         
         Query: {query}
         
         Return ONLY valid JSON in this exact format:
         {{
-            "sub_queries": ["sub query 1", "sub query 2"]
+            "sub_queries": ["sub query 1", "sub query 2"],
+            "filters": {{
+                "year": {{
+                    "operator": ">=",
+                    "value": 2022
+                }}
+            }}
         }}
+        Omit the "filters" key entirely if there are no metadata constraints.
         """
         logger.info(f"Requesting query decomposition from LLM ({self.model}) for query: '{query}'")
         response = await self.client.chat.completions.create(
@@ -75,10 +88,10 @@ class LLMService:
         
         try:
             data = json.loads(content)
-            return data.get("sub_queries", [query])
+            return data
         except Exception as e:
             logger.error(f"Failed to parse LLM JSON for decomposition: {e} | Content: {content}")
-            return [query]
+            return {"sub_queries": [query]}
 
     async def stream_synthesis(self, query: str, context: str) -> AsyncGenerator[Any, None]:
         if not self.client:

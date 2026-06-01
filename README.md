@@ -65,11 +65,11 @@ flowchart TD
 ## Key Features
 
 - **Hybrid Search** — Combines dense semantic embeddings with sparse BM25 keyword matching, fused via Reciprocal Rank Fusion (RRF) for superior recall over either method alone.
-- **Intelligent Query Routing** — A fast NLP-based router (<1ms) classifies incoming queries into three execution paths: Direct, Decompose (for comparative/multi-hop queries), or HyDE (for conceptual queries).
-- **LLM-Powered Query Decomposition** — Complex queries are split into atomic sub-queries with metadata filters (e.g., publication year) extracted via structured JSON output from an LLM. Filters are applied natively at the Qdrant Prefetch level.
+- **Intelligent Query Routing** — A lightning-fast hybrid router (<1ms) classifies incoming queries into Direct, Decompose, or HyDE paths. Includes regex-based **Hard Overrides** for guaranteed metadata routing without ML hallucinations.
+- **LLM-Powered Query Decomposition** — Complex queries are split into atomic sub-queries with strict mathematical metadata filters (e.g., publication year) extracted via JSON from an LLM. Filters are applied natively at the Qdrant Prefetch level.
+- **Global Late Re-ranking & Compute Budgeting** — Sub-queries are fetched concurrently and pooled before a single, mathematically calibrated cross-encoder pass against the original intent. Uses **Dynamic Compute Budgeting** to maximize database fetch limits without blowing up re-ranker latency.
 - **Layout-Aware PDF Parsing** — Docling-based visual document understanding preserves the semantic structure of academic papers (sections, tables, equations) instead of naive text splitting.
 - **Crash-Safe Batch Ingestion** — Cursor-based state management allows the pipeline to resume from the exact point of failure across millions of documents.
-- **Cross-Encoder Reranking** — A lightweight ONNX-optimized Jina reranker performs secondary cross-attention scoring to maximize precision in the final top-20 results.
 - **Streaming API** — FastAPI endpoint with Server-Sent Events (SSE) streams retrieved sources and LLM-synthesized answers token-by-token.
 
 ---
@@ -173,6 +173,8 @@ export EMBEDDING_MODEL="BAAI/bge-small-en-v1.5"
 export QDRANT_HOST="localhost"
 export QDRANT_PORT="6333"
 export QDRANT_COLLECTION="arxiv_chunks"
+export RERANKER_TRUNCATION_LENGTH="2000"
+export RERANKER_FETCH_MULTIPLIER="5"
 ```
 
 ---
