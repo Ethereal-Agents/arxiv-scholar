@@ -52,7 +52,13 @@ class HybridRetriever:
         # 2. Initialize two fastembed models (Dense and Sparse).
         # These are loaded globally for the instance and cached.
         logger.info(f"Loading dense model: {dense_model_name}")
-        self.dense_model = TextEmbedding(model_name=dense_model_name)
+        if "bge-m3" in dense_model_name.lower():
+            from arxiv_scholar.embedding.st_embedder import SentenceTransformerEmbedder
+            self.dense_model = SentenceTransformerEmbedder(model_name=dense_model_name)
+            self._is_st = True
+        else:
+            self.dense_model = TextEmbedding(model_name=dense_model_name)
+            self._is_st = False
         
         logger.info(f"Loading sparse model: {sparse_model_name}")
         self.sparse_model = SparseTextEmbedding(model_name=sparse_model_name)
@@ -78,7 +84,10 @@ class HybridRetriever:
         # 3. Generate the Dense vector for the query_text.
         # fastembed returns generators, so we consume it into a list and take the first item
         dq = dense_query_text if dense_query_text else query_text
-        dense_vector = list(self.dense_model.embed([dq]))[0].tolist()
+        if self._is_st:
+            dense_vector = self.dense_model.embed([dq])[0]
+        else:
+            dense_vector = list(self.dense_model.embed([dq]))[0].tolist()
 
         # 4. Generate the Sparse vector for the query_text.
         sparse_result = list(self.sparse_model.embed([query_text]))[0]

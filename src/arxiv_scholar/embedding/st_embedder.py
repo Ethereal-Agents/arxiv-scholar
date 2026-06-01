@@ -90,7 +90,14 @@ class SentenceTransformerEmbedder(BaseEmbedder):
             logger.info(
                 f"Loading embedding model '{model_name}' on device '{self._device}'..."
             )
-            self._model = SentenceTransformer(model_name, device=self._device)
+            model_kwargs = {}
+            if "bge-m3" in model_name.lower():
+                model_kwargs["max_seq_length"] = 1024
+                if self._device == "cuda":
+                    import torch
+                    model_kwargs["torch_dtype"] = torch.float16
+                    
+            self._model = SentenceTransformer(model_name, device=self._device, model_kwargs=model_kwargs)
             self._dimension = self._model.get_embedding_dimension()
             logger.info(
                 f"Model loaded. Dimension: {self._dimension}, Device: {self._device}"
