@@ -1,10 +1,11 @@
 from pydantic import BaseModel
 from typing import List, Dict, Any
+from configs.config import USE_RERANKER
 
 class QueryRequest(BaseModel):
     query: str
     limit: int = 5
-    use_reranker: bool = True
+    use_reranker: bool = USE_RERANKER
 
 class SourceNode(BaseModel):
     chunk_id: str
