@@ -25,3 +25,7 @@ EMBEDDING_DEVICE = os.getenv("EMBEDDING_DEVICE", "auto")
 QDRANT_HOST = os.getenv("QDRANT_HOST", "localhost")
 QDRANT_PORT = int(os.getenv("QDRANT_PORT", "6333"))
 QDRANT_COLLECTION = os.getenv("QDRANT_COLLECTION", "arxiv_papers")
+
+# Hybrid Search Fusion Weights
+DENSE_WEIGHT = float(os.getenv("DENSE_WEIGHT", "0.6"))
+SPARSE_WEIGHT = float(os.getenv("SPARSE_WEIGHT", "0.4"))

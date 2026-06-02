@@ -21,6 +21,8 @@ from configs.config import (
     RERANKER_MODEL,
     RERANKER_TRUNCATION_LENGTH,
     RERANKER_FETCH_MULTIPLIER,
+    DENSE_WEIGHT,
+    SPARSE_WEIGHT,
     USE_RERANKER,
 )
 
@@ -122,6 +124,7 @@ class HybridRetriever:
                 qdrant_filter = models.Filter(must=must_conditions)
 
         fetch_limit = limit * RERANKER_FETCH_MULTIPLIER if (use_reranker and self.reranker_model) else limit
+        
         prefetch_dense = models.Prefetch(
             query=dense_vector,
             using="",
@@ -136,13 +139,12 @@ class HybridRetriever:
             filter=qdrant_filter,
         )
 
-        # 6. Database Execution
-        # Trigger server-side Reciprocal Rank Fusion by passing prefetches
-        # and setting the query to models.FusionQuery
+        # Trigger server-side Reciprocal Rank Fusion with custom weights
+        # We assign DENSE_WEIGHT to prefetch_dense and SPARSE_WEIGHT to prefetch_sparse
         response = self.client.query_points(
             collection_name=self.collection_name,
             prefetch=[prefetch_dense, prefetch_sparse],
-            query=models.FusionQuery(fusion=models.Fusion.RRF),
+            query=models.RrfQuery(rrf=models.Rrf(weights=[DENSE_WEIGHT, SPARSE_WEIGHT])),
             limit=fetch_limit,
         )
 
