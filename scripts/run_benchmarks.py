@@ -16,7 +16,9 @@ spec = importlib.util.spec_from_file_location("local_config", config_path)
 config = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(config)
 
-from arxiv_scholar.retrieval.orchestrator import AdvancedRetriever
+from arxiv_scholar.retrieval.orchestrator import Orchestrator
+from qdrant_client import QdrantClient, models
+from fastembed import TextEmbedding, SparseTextEmbedding
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
@@ -58,7 +60,7 @@ async def run_evaluation(data_file: str, collection_name: str):
     # Filter out adversarial queries due to logical ground-truth mismatch
     queries = [q for q in queries if q.get("query_type") == "standard"]
         
-    retriever = AdvancedRetriever(
+    retriever = Orchestrator(
         collection_name=collection_name, 
         qdrant_host=config.QDRANT_HOST, 
         qdrant_port=config.QDRANT_PORT,
@@ -131,17 +133,150 @@ def calculate_cost(latency_mean_ms):
     sec_per_1k = (latency_mean_ms / 1000.0) * 1000
     return sec_per_1k * cost_per_sec
 
+async def run_alpha_sweep(data_file: str, collection_name: str, qdrant_client_obj, dense_embedder, sparse_embedder):
+    logger.info(f"Running Alpha Sweep on {data_file} for collection {collection_name}")
+    
+    from fastembed.rerank.cross_encoder import TextCrossEncoder
+    reranker = TextCrossEncoder(model_name="jinaai/jina-reranker-v1-tiny-en")
+    if not os.path.exists(data_file):
+        raise FileNotFoundError(f"Missing {data_file}.")
+        
+    with open(data_file, "r") as f:
+        queries = [json.loads(line) for line in f]
+        
+    queries = [q for q in queries if q.get("query_type") == "standard"]
+    
+    alpha_recalls = {round(a, 1): [] for a in np.arange(0.0, 1.1, 0.1)}
+    
+    for q in tqdm(queries, desc="Alpha Sweep"):
+        query_text = q["query"]
+        target_id = str(q["positive_chunk"]["chunk_id"])
+        
+        # Dense Embedding
+        dense_vector = list(dense_embedder.embed([query_text]))[0].tolist()
+        
+        # Sparse Embedding
+        sparse_result = list(sparse_embedder.embed([query_text]))[0]
+        sparse_vector = models.SparseVector(
+            indices=sparse_result.indices,
+            values=sparse_result.values,
+        )
+        
+        # Search independently
+        dense_res = await asyncio.to_thread(
+            qdrant_client_obj.query_points,
+            collection_name=collection_name,
+            query=dense_vector,
+            limit=100,
+            with_payload=["content"]
+        )
+        
+        sparse_res = await asyncio.to_thread(
+            qdrant_client_obj.query_points,
+            collection_name=collection_name,
+            query=sparse_vector,
+            using="bm25",
+            limit=100,
+            with_payload=["content"]
+        )
+        
+        dense_scores = {str(hit.id): hit.score for hit in dense_res.points}
+        sparse_scores = {str(hit.id): hit.score for hit in sparse_res.points}
+        
+        def min_max_norm(scores_dict):
+            if not scores_dict:
+                return {}
+            vals = list(scores_dict.values())
+            min_v = min(vals)
+            max_v = max(vals)
+            if max_v == min_v:
+                return {k: 0.0 for k in scores_dict}
+            return {k: (v - min_v) / (max_v - min_v) for k, v in scores_dict.items()}
+            
+        norm_dense = min_max_norm(dense_scores)
+        norm_sparse = min_max_norm(sparse_scores)
+        
+        id_to_content = {}
+        for hit in list(dense_res.points) + list(sparse_res.points):
+            id_to_content[str(hit.id)] = (hit.payload or {}).get("content", "")[:500] # trunc
+            
+        all_ids = list(set(norm_dense.keys()).union(set(norm_sparse.keys())))
+        
+        # Pre-compute cross-encoder scores for all retrieved candidates
+        docs = [id_to_content[cid] for cid in all_ids]
+        cross_scores = list(reranker.rerank(query_text, docs))
+        reranker_scores = {cid: float(score) for cid, score in zip(all_ids, cross_scores)}
+        
+        for alpha in np.arange(0.0, 1.1, 0.1):
+            alpha = round(alpha, 1)
+            combined = []
+            for cid in all_ids:
+                d_score = norm_dense.get(cid, 0.0)
+                s_score = norm_sparse.get(cid, 0.0)
+                final_score = (alpha * d_score) + ((1 - alpha) * s_score)
+                combined.append((cid, final_score))
+                
+            # Take top 100 fusion candidates
+            combined.sort(key=lambda x: x[1], reverse=True)
+            top_100_fused = [x[0] for x in combined[:100]]
+            
+            # Rerank the top 100 fusion candidates
+            reranked = sorted(top_100_fused, key=lambda cid: reranker_scores[cid], reverse=True)
+            final_top_20 = reranked[:20]
+            
+            if target_id in final_top_20:
+                alpha_recalls[alpha].append(1.0)
+            else:
+                alpha_recalls[alpha].append(0.0)
+                
+    print("\n" + "="*50)
+    print("ALPHA SWEEP RESULTS (Recall@20)")
+    print("="*50)
+    print(f"{'Alpha (Dense Weight)':<25} | {'Recall@20':<10}")
+    print("-" * 50)
+    for alpha in sorted(alpha_recalls.keys()):
+        avg_recall = np.mean(alpha_recalls[alpha]) if alpha_recalls[alpha] else 0.0
+        print(f"{alpha:<25.1f} | {avg_recall:.4f}")
+    print("="*50)
+
 async def main_async():
     parser = argparse.ArgumentParser()
     parser.add_argument("--data", default="data/eval_dataset.jsonl")
     parser.add_argument("--metrics-port", type=int, default=8000)
+    parser.add_argument("--collection", default="arxiv_papers", help="Target collection name.")
+    parser.add_argument("--alpha-sweep", action="store_true", help="Run the alpha sweep diagnostics.")
     args = parser.parse_args()
     
+    if args.alpha_sweep:
+        logger.info("Initializing Qdrant and Embedders for Alpha Sweep...")
+        qdrant_client_obj = QdrantClient(host=config.QDRANT_HOST, port=config.QDRANT_PORT)
+        try:
+            dense_embedder = TextEmbedding(model_name=config.EMBEDDING_MODEL)
+        except ValueError:
+            from sentence_transformers import SentenceTransformer
+            class STWrapper:
+                def __init__(self, m_name):
+                    self.model = SentenceTransformer(m_name)
+                def embed(self, texts):
+                    yield from self.model.encode(texts)
+            dense_embedder = STWrapper(config.EMBEDDING_MODEL)
+            
+        sparse_embedder = SparseTextEmbedding(model_name=config.SPARSE_EMBEDDING_MODEL)
+        
+        await run_alpha_sweep(
+            data_file=args.data,
+            collection_name=args.collection,
+            qdrant_client_obj=qdrant_client_obj,
+            dense_embedder=dense_embedder,
+            sparse_embedder=sparse_embedder
+        )
+        return
+
     # Start prometheus metrics server
     logger.info(f"Starting Prometheus endpoint on port {args.metrics_port}")
     start_http_server(args.metrics_port)
     
-    collections = ["arxiv_papers"]
+    collections = [args.collection]
     results = []
     
     for coll in collections:
