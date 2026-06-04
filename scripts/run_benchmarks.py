@@ -144,7 +144,7 @@ async def run_alpha_sweep(data_file: str, collection_name: str, retriever):
         
     queries = [q for q in queries if q.get("query_type") == "standard"]
     
-    alpha_metrics = {round(a, 1): {"recalls": [], "ndcgs": [], "latencies": []} for a in np.arange(0.0, 1.1, 0.1)}
+    alpha_metrics = {round(a, 1): {"recalls": [], "ndcgs": [], "latencies": [], "fusion_latencies": []} for a in np.arange(0.0, 1.1, 0.1)}
     
     from qdrant_client.http import models
     for q in tqdm(queries, desc="Alpha Sweep"):
@@ -208,6 +208,7 @@ async def run_alpha_sweep(data_file: str, collection_name: str, retriever):
             combined.sort(key=lambda x: x[1], reverse=True)
             final_top_20 = [x[0] for x in combined[:20]]
             
+            fusion_latency_ms = (time.perf_counter() - start_fuse_t) * 1000
             latency = base_latency + (time.perf_counter() - start_fuse_t)
             
             if target_id in final_top_20:
@@ -218,21 +219,23 @@ async def run_alpha_sweep(data_file: str, collection_name: str, retriever):
             ndcg_val = calculate_ndcg(final_top_20, target_id, hard_neg_ids, k=10)
             alpha_metrics[alpha]["ndcgs"].append(ndcg_val)
             alpha_metrics[alpha]["latencies"].append(latency)
+            alpha_metrics[alpha]["fusion_latencies"].append(fusion_latency_ms)
                 
-    print("\n" + "="*85)
+    print("\n" + "="*95)
     print("ALPHA SWEEP RESULTS")
-    print("="*85)
-    format_str = "{:<25} | {:<10} | {:<10} | {:<10} | {:<10}"
-    print(format_str.format("Alpha (Dense Weight)", "Recall@20", "nDCG@10", "p95 (ms)", "p99 (ms)"))
-    print("-" * 85)
+    print("="*95)
+    format_str = "{:<25} | {:<10} | {:<10} | {:<10} | {:<10} | {:<12}"
+    print(format_str.format("Alpha (Dense Weight)", "Recall@20", "nDCG@10", "p95 (ms)", "p99 (ms)", "Fusion (ms)"))
+    print("-" * 95)
     for alpha in sorted(alpha_metrics.keys()):
         m = alpha_metrics[alpha]
         avg_recall = np.mean(m["recalls"]) if m["recalls"] else 0.0
         avg_ndcg = np.mean(m["ndcgs"]) if m["ndcgs"] else 0.0
         p95 = np.percentile(m["latencies"], 95) * 1000 if m["latencies"] else 0.0
         p99 = np.percentile(m["latencies"], 99) * 1000 if m["latencies"] else 0.0
-        print(format_str.format(f"{alpha:.1f}", f"{avg_recall:.4f}", f"{avg_ndcg:.4f}", f"{p95:.1f}", f"{p99:.1f}"))
-    print("="*85)
+        avg_fusion = np.mean(m["fusion_latencies"]) if "fusion_latencies" in m and m["fusion_latencies"] else 0.0
+        print(format_str.format(f"{alpha:.1f}", f"{avg_recall:.4f}", f"{avg_ndcg:.4f}", f"{p95:.1f}", f"{p99:.1f}", f"{avg_fusion:.4f}"))
+    print("="*95)
 
 async def main_async():
     parser = argparse.ArgumentParser()
