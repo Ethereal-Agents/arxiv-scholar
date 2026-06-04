@@ -54,6 +54,7 @@ class LayoutAwareChunker(BaseChunker):
             from docling.chunking import HierarchicalChunker
             
             pipeline_options = PdfPipelineOptions()
+            pipeline_options.do_ocr = False
             pipeline_options.accelerator_options = AcceleratorOptions(
                 num_threads=1, device=AcceleratorDevice.CPU
             )
