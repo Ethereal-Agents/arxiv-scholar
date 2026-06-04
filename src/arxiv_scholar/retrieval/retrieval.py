@@ -70,8 +70,36 @@ class HybridRetriever:
         if reranker_model_name:
             logger.info(f"Loading fastembed reranker model: {reranker_model_name}")
             self.reranker_model = TextCrossEncoder(model_name=reranker_model_name)
+            
+        # Proactively validate embedding dimension against Qdrant collection
+        try:
+            collection_info = self.client.get_collection(self.collection_name)
+            vec_params = collection_info.config.params.vectors
+            if isinstance(vec_params, models.VectorParams):
+                qdrant_dim = vec_params.size
+            elif isinstance(vec_params, dict) and "" in vec_params:
+                qdrant_dim = vec_params[""].size
+            else:
+                qdrant_dim = None
 
-    def retrieve(self, query_text: str, limit: int = 20, use_reranker: bool = USE_RERANKER, dense_query_text: str = None, filters: Dict[str, Any] = None) -> List[Dict[str, Any]]:
+            if qdrant_dim is not None:
+                if hasattr(self.dense_model, "dimension"):
+                    model_dim = self.dense_model.dimension
+                else:
+                    if self._is_st:
+                        test_vec = self.dense_model.embed(["test"])[0]
+                    else:
+                        test_vec = list(self.dense_model.embed(["test"]))[0]
+                    model_dim = len(test_vec)
+                    
+                if model_dim != qdrant_dim:
+                    raise ValueError(f"Vector dimension mismatch! Qdrant collection '{self.collection_name}' expects {qdrant_dim}D vectors, but embedder '{dense_model_name}' produces {model_dim}D. Please check your configurations.")
+        except Exception as e:
+            if isinstance(e, ValueError) and "Vector dimension mismatch" in str(e):
+                raise
+            logger.warning(f"Could not validate collection dimensions during init: {e}")
+
+    def retrieve(self, query_text: str, limit: int = 20, use_reranker: bool = USE_RERANKER, dense_query_text: str = None, filters: Dict[str, Any] = None, dense_weight: float = DENSE_WEIGHT, sparse_weight: float = SPARSE_WEIGHT) -> List[Dict[str, Any]]:
         """Executes a hybrid search query with server-side RRF.
         
         Args:
@@ -125,40 +153,62 @@ class HybridRetriever:
 
         fetch_limit = limit * RERANKER_FETCH_MULTIPLIER if (use_reranker and self.reranker_model) else limit
         
-        prefetch_dense = models.Prefetch(
-            query=dense_vector,
-            using="",
-            limit=fetch_limit,
-            filter=qdrant_filter,
-        )
-
-        prefetch_sparse = models.Prefetch(
-            query=sparse_vector,
-            using="bm25",
-            limit=fetch_limit,
-            filter=qdrant_filter,
-        )
-
-        # Trigger server-side Reciprocal Rank Fusion with custom weights
-        # We assign DENSE_WEIGHT to prefetch_dense and SPARSE_WEIGHT to prefetch_sparse
-        response = self.client.query_points(
+        # 6. Fetch independently and fuse manually with Min-Max normalization
+        # We batch both queries into a single network round-trip to minimize latency
+        batch_responses = self.client.query_batch_points(
             collection_name=self.collection_name,
-            prefetch=[prefetch_dense, prefetch_sparse],
-            query=models.RrfQuery(rrf=models.Rrf(weights=[DENSE_WEIGHT, SPARSE_WEIGHT])),
-            limit=fetch_limit,
+            requests=[
+                models.QueryRequest(
+                    query=dense_vector,
+                    using="",
+                    limit=fetch_limit,
+                    filter=qdrant_filter,
+                    with_payload=True,
+                ),
+                models.QueryRequest(
+                    query=sparse_vector,
+                    using="bm25",
+                    limit=fetch_limit,
+                    filter=qdrant_filter,
+                    with_payload=True,
+                )
+            ]
         )
+        
+        dense_response = batch_responses[0]
+        sparse_response = batch_responses[1]
 
-        # 7. Output Formatting
-        # Extract the payload and the fused score from the returned Qdrant points
-        results = []
-        for point in response.points:
+        def normalize_scores(points):
+            if not points:
+                return {}
+            scores = {str(p.id): p.score for p in points}
+            min_val = min(scores.values())
+            max_val = max(scores.values())
+            if max_val == min_val:
+                return {k: 0.0 for k in scores}
+            return {k: (v - min_val) / (max_val - min_val) for k, v in scores.items()}
+
+        norm_dense = normalize_scores(dense_response.points)
+        norm_sparse = normalize_scores(sparse_response.points)
+
+        all_points = {str(p.id): p for p in dense_response.points + sparse_response.points}
+        
+        # 7. Output Formatting & Fusion
+        results_unsorted = []
+        for chunk_id, point in all_points.items():
+            d_score = norm_dense.get(chunk_id, 0.0)
+            s_score = norm_sparse.get(chunk_id, 0.0)
+            fused_score = (dense_weight * d_score) + (sparse_weight * s_score)
+            
             payload = point.payload or {}
-            results.append({
-                "chunk_id": str(point.id),
+            results_unsorted.append({
+                "chunk_id": chunk_id,
                 "text": payload.get("content", ""),
-                "score": point.score,
+                "score": fused_score,
                 "metadata": payload.get("metadata", {}),
             })
+            
+        results = sorted(results_unsorted, key=lambda x: x["score"], reverse=True)[:fetch_limit]
             
         if use_reranker and self.reranker_model and results:
             results = self.rerank_results(query_text, results, limit)
