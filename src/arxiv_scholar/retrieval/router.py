@@ -40,13 +40,16 @@ class MLQueryRouter:
             
         # ML Routing (if loaded and vector provided)
         if self.classifier is not None and query_vector is not None:
-            pred = self.classifier.predict([query_vector])[0]
-            if pred == 1:
-                logger.info(f"ML Router predicted class {pred} -> Route.DECOMPOSE")
-                return Route.DECOMPOSE
-            else:
-                logger.info(f"ML Router predicted class {pred} -> Route.DIRECT")
-                return Route.DIRECT
+            try:
+                pred = self.classifier.predict([query_vector])[0]
+                if pred == 1:
+                    logger.info(f"ML Router predicted class {pred} -> Route.DECOMPOSE")
+                    return Route.DECOMPOSE
+                else:
+                    logger.info(f"ML Router predicted class {pred} -> Route.DIRECT")
+                    return Route.DIRECT
+            except ValueError as e:
+                logger.warning(f"ML Router failed (dimension mismatch?): {e}")
             
         # Default fallback: Long, highly-descriptive queries already have enough semantic density
         logger.info("Default fallback reached, returning Route.DIRECT")

@@ -51,7 +51,8 @@ class Orchestrator:
     async def retrieve(self, query: str, limit: int = 20, use_reranker: bool = USE_RERANKER) -> List[Dict[str, Any]]:
         logger.info(f"Orchestrator.retrieve called with query: '{query}', limit={limit}, use_reranker={use_reranker}")
         # Compute dense embedding to feed to the ML router
-        dense_vec = list(self.retriever.dense_model.embed([query]))[0].tolist()
+        dense_out = list(self.retriever.dense_model.embed([query]))[0]
+        dense_vec = dense_out.tolist() if hasattr(dense_out, "tolist") else dense_out
         route = self.router.route(query, query_vector=dense_vec)
         logger.info(f"Router selected route: {route.name}")
         # Note: In a real system, we'd return the route to log the prometheus path metric
