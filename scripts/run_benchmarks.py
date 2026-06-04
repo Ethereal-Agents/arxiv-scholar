@@ -69,8 +69,8 @@ async def run_evaluation(data_file: str, collection_name: str):
     
     results_list = []
     
-    for use_reranker in [False, True]:
-        mode_name = f"{collection_name} (Reranked)" if use_reranker else f"{collection_name} (Baseline)"
+    for use_reranker in [False]:
+        mode_name = f"{collection_name} (Baseline)"
         
         recalls_5 = []
         recalls_10 = []
@@ -191,22 +191,6 @@ async def run_alpha_sweep(data_file: str, collection_name: str, retriever):
         norm_sparse = normalize_scores(sparse_response.points)
         all_points = {str(p.id): p for p in list(dense_response.points) + list(sparse_response.points)}
         
-        # 4. Precompute Reranker Scores
-        all_ids = list(all_points.keys())
-        docs = [all_points[cid].payload.get("content", "")[:2000] if all_points[cid].payload else "" for cid in all_ids]
-        
-        start_rerank_t = time.perf_counter()
-        
-        # Use the tiny Jina reranker to avoid 1-hour sweep runtimes on CPU
-        if not hasattr(retriever, '_fast_reranker'):
-            from fastembed.rerank.cross_encoder import TextCrossEncoder
-            logger.info("Loading fast Jina reranker for alpha sweep...")
-            retriever._fast_reranker = TextCrossEncoder(model_name="jinaai/jina-reranker-v1-tiny-en")
-            
-        cross_scores = list(retriever._fast_reranker.rerank(query_text, docs))
-        rerank_latency = time.perf_counter() - start_rerank_t
-        reranker_scores = {cid: float(score) for cid, score in zip(all_ids, cross_scores)}
-        
         base_latency = time.perf_counter() - start_t
         
         for alpha in np.arange(0.0, 1.1, 0.1):
@@ -222,11 +206,7 @@ async def run_alpha_sweep(data_file: str, collection_name: str, retriever):
                 combined.append((cid, final_score))
                 
             combined.sort(key=lambda x: x[1], reverse=True)
-            top_100_fused = [x[0] for x in combined[:100]]
-            
-            # Rerank
-            reranked = sorted(top_100_fused, key=lambda cid: reranker_scores[cid], reverse=True)
-            final_top_20 = reranked[:20]
+            final_top_20 = [x[0] for x in combined[:20]]
             
             latency = base_latency + (time.perf_counter() - start_fuse_t)
             
