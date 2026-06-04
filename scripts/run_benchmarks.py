@@ -133,11 +133,9 @@ def calculate_cost(latency_mean_ms):
     sec_per_1k = (latency_mean_ms / 1000.0) * 1000
     return sec_per_1k * cost_per_sec
 
-async def run_alpha_sweep(data_file: str, collection_name: str, qdrant_client_obj, dense_embedder, sparse_embedder):
+async def run_alpha_sweep(data_file: str, collection_name: str, retriever):
     logger.info(f"Running Alpha Sweep on {data_file} for collection {collection_name}")
     
-    from fastembed.rerank.cross_encoder import TextCrossEncoder
-    reranker = TextCrossEncoder(model_name="jinaai/jina-reranker-v1-tiny-en")
     if not os.path.exists(data_file):
         raise FileNotFoundError(f"Missing {data_file}.")
         
@@ -146,98 +144,115 @@ async def run_alpha_sweep(data_file: str, collection_name: str, qdrant_client_ob
         
     queries = [q for q in queries if q.get("query_type") == "standard"]
     
-    alpha_recalls = {round(a, 1): [] for a in np.arange(0.0, 1.1, 0.1)}
+    alpha_metrics = {round(a, 1): {"recalls": [], "ndcgs": [], "latencies": []} for a in np.arange(0.0, 1.1, 0.1)}
     
+    from qdrant_client.http import models
     for q in tqdm(queries, desc="Alpha Sweep"):
         query_text = q["query"]
         target_id = str(q["positive_chunk"]["chunk_id"])
+        hard_neg_ids = [str(hn["chunk_id"]) for hn in q.get("hard_negatives", [])]
         
-        # Dense Embedding
-        dense_vector = list(dense_embedder.embed([query_text]))[0].tolist()
-        
-        # Sparse Embedding
-        sparse_result = list(sparse_embedder.embed([query_text]))[0]
+        # 1. Embed once
+        start_t = time.perf_counter()
+        if retriever._is_st:
+            dense_vector = retriever.dense_model.embed([query_text])[0]
+        else:
+            dense_vector = list(retriever.dense_model.embed([query_text]))[0]
+            
+        sparse_result = list(retriever.sparse_model.embed([query_text]))[0]
         sparse_vector = models.SparseVector(
             indices=sparse_result.indices,
             values=sparse_result.values,
         )
         
-        # Search independently
-        dense_res = await asyncio.to_thread(
-            qdrant_client_obj.query_points,
-            collection_name=collection_name,
-            query=dense_vector,
-            limit=100,
-            with_payload=["content"]
+        # 2. Fetch once (limit=100)
+        batch_responses = await asyncio.to_thread(
+            retriever.client.query_batch_points,
+            collection_name=retriever.collection_name,
+            requests=[
+                models.QueryRequest(query=dense_vector, using="", limit=100, with_payload=True),
+                models.QueryRequest(query=sparse_vector, using="bm25", limit=100, with_payload=True)
+            ]
         )
         
-        sparse_res = await asyncio.to_thread(
-            qdrant_client_obj.query_points,
-            collection_name=collection_name,
-            query=sparse_vector,
-            using="bm25",
-            limit=100,
-            with_payload=["content"]
-        )
+        dense_response = batch_responses[0]
+        sparse_response = batch_responses[1]
         
-        dense_scores = {str(hit.id): hit.score for hit in dense_res.points}
-        sparse_scores = {str(hit.id): hit.score for hit in sparse_res.points}
+        # 3. Normalize scores
+        def normalize_scores(points):
+            if not points: return {}
+            scores = {str(p.id): p.score for p in points}
+            min_val = min(scores.values())
+            max_val = max(scores.values())
+            if max_val == min_val: return {k: 0.0 for k in scores}
+            return {k: (v - min_val) / (max_val - min_val) for k, v in scores.items()}
+
+        norm_dense = normalize_scores(dense_response.points)
+        norm_sparse = normalize_scores(sparse_response.points)
+        all_points = {str(p.id): p for p in list(dense_response.points) + list(sparse_response.points)}
         
-        def min_max_norm(scores_dict):
-            if not scores_dict:
-                return {}
-            vals = list(scores_dict.values())
-            min_v = min(vals)
-            max_v = max(vals)
-            if max_v == min_v:
-                return {k: 0.0 for k in scores_dict}
-            return {k: (v - min_v) / (max_v - min_v) for k, v in scores_dict.items()}
+        # 4. Precompute Reranker Scores
+        all_ids = list(all_points.keys())
+        docs = [all_points[cid].payload.get("content", "")[:2000] if all_points[cid].payload else "" for cid in all_ids]
+        
+        start_rerank_t = time.perf_counter()
+        
+        # Use the tiny Jina reranker to avoid 1-hour sweep runtimes on CPU
+        if not hasattr(retriever, '_fast_reranker'):
+            from fastembed.rerank.cross_encoder import TextCrossEncoder
+            logger.info("Loading fast Jina reranker for alpha sweep...")
+            retriever._fast_reranker = TextCrossEncoder(model_name="jinaai/jina-reranker-v1-tiny-en")
             
-        norm_dense = min_max_norm(dense_scores)
-        norm_sparse = min_max_norm(sparse_scores)
-        
-        id_to_content = {}
-        for hit in list(dense_res.points) + list(sparse_res.points):
-            id_to_content[str(hit.id)] = (hit.payload or {}).get("content", "")[:500] # trunc
-            
-        all_ids = list(set(norm_dense.keys()).union(set(norm_sparse.keys())))
-        
-        # Pre-compute cross-encoder scores for all retrieved candidates
-        docs = [id_to_content[cid] for cid in all_ids]
-        cross_scores = list(reranker.rerank(query_text, docs))
+        cross_scores = list(retriever._fast_reranker.rerank(query_text, docs))
+        rerank_latency = time.perf_counter() - start_rerank_t
         reranker_scores = {cid: float(score) for cid, score in zip(all_ids, cross_scores)}
+        
+        base_latency = time.perf_counter() - start_t
         
         for alpha in np.arange(0.0, 1.1, 0.1):
             alpha = round(alpha, 1)
+            
+            # Combine and sort
+            start_fuse_t = time.perf_counter()
             combined = []
-            for cid in all_ids:
+            for cid in all_points.keys():
                 d_score = norm_dense.get(cid, 0.0)
                 s_score = norm_sparse.get(cid, 0.0)
                 final_score = (alpha * d_score) + ((1 - alpha) * s_score)
                 combined.append((cid, final_score))
                 
-            # Take top 100 fusion candidates
             combined.sort(key=lambda x: x[1], reverse=True)
             top_100_fused = [x[0] for x in combined[:100]]
             
-            # Rerank the top 100 fusion candidates
+            # Rerank
             reranked = sorted(top_100_fused, key=lambda cid: reranker_scores[cid], reverse=True)
             final_top_20 = reranked[:20]
             
+            latency = base_latency + (time.perf_counter() - start_fuse_t)
+            
             if target_id in final_top_20:
-                alpha_recalls[alpha].append(1.0)
+                alpha_metrics[alpha]["recalls"].append(1.0)
             else:
-                alpha_recalls[alpha].append(0.0)
+                alpha_metrics[alpha]["recalls"].append(0.0)
                 
-    print("\n" + "="*50)
-    print("ALPHA SWEEP RESULTS (Recall@20)")
-    print("="*50)
-    print(f"{'Alpha (Dense Weight)':<25} | {'Recall@20':<10}")
-    print("-" * 50)
-    for alpha in sorted(alpha_recalls.keys()):
-        avg_recall = np.mean(alpha_recalls[alpha]) if alpha_recalls[alpha] else 0.0
-        print(f"{alpha:<25.1f} | {avg_recall:.4f}")
-    print("="*50)
+            ndcg_val = calculate_ndcg(final_top_20, target_id, hard_neg_ids, k=10)
+            alpha_metrics[alpha]["ndcgs"].append(ndcg_val)
+            alpha_metrics[alpha]["latencies"].append(latency)
+                
+    print("\n" + "="*85)
+    print("ALPHA SWEEP RESULTS")
+    print("="*85)
+    format_str = "{:<25} | {:<10} | {:<10} | {:<10} | {:<10}"
+    print(format_str.format("Alpha (Dense Weight)", "Recall@20", "nDCG@10", "p95 (ms)", "p99 (ms)"))
+    print("-" * 85)
+    for alpha in sorted(alpha_metrics.keys()):
+        m = alpha_metrics[alpha]
+        avg_recall = np.mean(m["recalls"]) if m["recalls"] else 0.0
+        avg_ndcg = np.mean(m["ndcgs"]) if m["ndcgs"] else 0.0
+        p95 = np.percentile(m["latencies"], 95) * 1000 if m["latencies"] else 0.0
+        p99 = np.percentile(m["latencies"], 99) * 1000 if m["latencies"] else 0.0
+        print(format_str.format(f"{alpha:.1f}", f"{avg_recall:.4f}", f"{avg_ndcg:.4f}", f"{p95:.1f}", f"{p99:.1f}"))
+    print("="*85)
 
 async def main_async():
     parser = argparse.ArgumentParser()
@@ -248,27 +263,18 @@ async def main_async():
     args = parser.parse_args()
     
     if args.alpha_sweep:
-        logger.info("Initializing Qdrant and Embedders for Alpha Sweep...")
-        qdrant_client_obj = QdrantClient(host=config.QDRANT_HOST, port=config.QDRANT_PORT)
-        try:
-            dense_embedder = TextEmbedding(model_name=config.EMBEDDING_MODEL)
-        except ValueError:
-            from sentence_transformers import SentenceTransformer
-            class STWrapper:
-                def __init__(self, m_name):
-                    self.model = SentenceTransformer(m_name)
-                def embed(self, texts):
-                    yield from self.model.encode(texts)
-            dense_embedder = STWrapper(config.EMBEDDING_MODEL)
-            
-        sparse_embedder = SparseTextEmbedding(model_name=config.SPARSE_EMBEDDING_MODEL)
+        logger.info("Initializing HybridRetriever for Alpha Sweep...")
+        from arxiv_scholar.retrieval.retrieval import HybridRetriever
+        retriever = HybridRetriever(
+            collection_name=args.collection,
+            qdrant_host=config.QDRANT_HOST,
+            qdrant_port=config.QDRANT_PORT
+        )
         
         await run_alpha_sweep(
             data_file=args.data,
             collection_name=args.collection,
-            qdrant_client_obj=qdrant_client_obj,
-            dense_embedder=dense_embedder,
-            sparse_embedder=sparse_embedder
+            retriever=retriever
         )
         return
 
