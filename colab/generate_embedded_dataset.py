@@ -48,6 +48,7 @@ def main():
     parser.add_argument("--target-chunk-size", type=int, default=1000, help="Target chunk size in chars")
     parser.add_argument("--embedding-batch-size", type=int, default=32, help="Embedding batch size")
     parser.add_argument("--append", action="store_true", help="Append to existing file instead of overwriting")
+    parser.add_argument("--colab-gpu", action="store_true", help="Optimize Docling for Colab GPU (uses CUDA + 4 threads for layout detection)")
     args = parser.parse_args()
 
     # --- Initialize pipeline components ---
@@ -61,6 +62,22 @@ def main():
         max_chunk_size=args.max_chunk_size,
         target_chunk_size=args.target_chunk_size,
     )
+
+    # Override Docling's converter for Colab GPU acceleration
+    if args.colab_gpu and chunker._is_ready:
+        from docling.document_converter import DocumentConverter, PdfFormatOption
+        from docling.datamodel.pipeline_options import PdfPipelineOptions, AcceleratorOptions, AcceleratorDevice
+        from docling.datamodel.base_models import InputFormat
+
+        gpu_pipeline_options = PdfPipelineOptions()
+        gpu_pipeline_options.do_ocr = False
+        gpu_pipeline_options.accelerator_options = AcceleratorOptions(
+            num_threads=4, device=AcceleratorDevice.AUTO
+        )
+        chunker._converter = DocumentConverter(
+            format_options={InputFormat.PDF: PdfFormatOption(pipeline_options=gpu_pipeline_options)}
+        )
+        logger.info("Docling overridden: using GPU acceleration with 4 threads")
     dense_embedder = SentenceTransformerEmbedder(
         model_name="BAAI/bge-m3",
         batch_size=args.embedding_batch_size,
