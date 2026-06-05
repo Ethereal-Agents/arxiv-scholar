@@ -42,6 +42,8 @@ class QdrantVectorStore(BaseVectorStore):
         collection_name: str,
         host: str = "localhost",
         port: int = 6333,
+        url: Optional[str] = None,
+        api_key: Optional[str] = None,
         location: Optional[str] = None,
     ) -> None:
         self.collection_name = collection_name
@@ -49,6 +51,9 @@ class QdrantVectorStore(BaseVectorStore):
         if location == ":memory:":
             self._client = QdrantClient(location=":memory:")
             logger.info("QdrantVectorStore initialised in-memory (test mode).")
+        elif url and api_key:
+            self._client = QdrantClient(url=url, api_key=api_key)
+            logger.info("QdrantVectorStore connected to Qdrant Cloud: %s", url)
         else:
             self._client = QdrantClient(host=host, port=port)
             logger.info(

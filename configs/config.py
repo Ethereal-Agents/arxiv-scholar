@@ -22,9 +22,11 @@ EMBEDDING_BATCH_SIZE = int(os.getenv("EMBEDDING_BATCH_SIZE", "32"))
 EMBEDDING_DEVICE = os.getenv("EMBEDDING_DEVICE", "auto")
 
 # Qdrant storage configuration
+QDRANT_URL = os.getenv("QDRANT_URL", None)
+QDRANT_API_KEY = os.getenv("QDRANT_API_KEY", None)
 QDRANT_HOST = os.getenv("QDRANT_HOST", "localhost")
 QDRANT_PORT = int(os.getenv("QDRANT_PORT", "6333"))
-QDRANT_COLLECTION = os.getenv("QDRANT_COLLECTION", "arxiv_papers")
+QDRANT_COLLECTION = os.getenv("QDRANT_COLLECTION", "arxiv_papers_m3")
 
 # Hybrid Search Fusion Weights
 DENSE_WEIGHT = float(os.getenv("DENSE_WEIGHT", "0.6"))

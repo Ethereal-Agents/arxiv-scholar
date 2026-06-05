@@ -34,14 +34,17 @@ class LayoutAwareChunker(BaseChunker):
     block exceeds the maximum token/character limit.
     """
 
-    def __init__(self, max_chunk_size: int = 1500) -> None:
+    def __init__(self, max_chunk_size: int = 1500, target_chunk_size: int = 1000) -> None:
         """Initializes the LayoutAwareChunker.
         
         Args:
             max_chunk_size: Maximum allowed size for a single layout chunk.
                             Blocks larger than this will be processed by the fallback chunker.
+            target_chunk_size: Target optimal size for a single layout chunk in characters.
+                               Small chunks will be merged until they reach this size (approx. 200 words).
         """
         self.max_chunk_size = max_chunk_size
+        self.target_chunk_size = target_chunk_size
         self.fallback_chunker = SlidingWindowChunker(
             chunk_size=self.max_chunk_size, 
             chunk_overlap=200
@@ -93,44 +96,56 @@ class LayoutAwareChunker(BaseChunker):
             return
 
         try:
-            # Convert PDF into Docling's internal representation
+            # Convert PDF into Docling's internal representation (fast path)
             dl_doc = self._converter.convert(source_path).document
+            
+            import re
+            sample_text = dl_doc.export_to_markdown()[:5000]
+            if len(re.findall(r'/[A-Z0-9]{2}', sample_text)) > 20:
+                logger.info(f"Garbled font encoding detected in {source_path}. Falling back to OCR.")
+                from docling.document_converter import DocumentConverter, PdfFormatOption
+                from docling.datamodel.pipeline_options import PdfPipelineOptions, AcceleratorOptions, AcceleratorDevice
+                from docling.datamodel.base_models import InputFormat
+                
+                ocr_opts = PdfPipelineOptions()
+                ocr_opts.do_ocr = True
+                ocr_opts.accelerator_options = AcceleratorOptions(num_threads=1, device=AcceleratorDevice.CPU)
+                
+                ocr_converter = DocumentConverter(
+                    format_options={InputFormat.PDF: PdfFormatOption(pipeline_options=ocr_opts)}
+                )
+                dl_doc = ocr_converter.convert(source_path).document
             
             # Use Docling's hierarchical chunker
             chunk_iter = self._hierarchical_chunker.chunk(dl_doc)
             
             chunk_index = 0
-            for docling_chunk in chunk_iter:
-                text = docling_chunk.text
-                
-                if not text or not text.strip():
-                    continue
-                
-                # Check if this layout chunk is too large
-                if len(text) > self.max_chunk_size:
+            buffer_text = ""
+
+            def flush_buffer():
+                nonlocal chunk_index, buffer_text
+                if not buffer_text:
+                    return
+                if len(buffer_text) > self.max_chunk_size:
                     logger.debug(
-                        f"Layout block too large ({len(text)} chars). "
+                        f"Layout block too large ({len(buffer_text)} chars). "
                         "Falling back to sliding window."
                     )
-                    # Create a temporary document just for the fallback chunker
                     temp_doc = Document(
                         id=document.id,
-                        content=text,
+                        content=buffer_text,
                         metadata=document.metadata
                     )
-                    
                     for sub_chunk in self.fallback_chunker.chunk(temp_doc):
-                        # Override the chunk_index logic to fit our master stream
                         sub_chunk.metadata["chunk_index"] = chunk_index
                         sub_chunk.metadata["chunking_strategy"] = "layout_aware_fallback"
                         yield sub_chunk
                         chunk_index += 1
                 else:
-                    # Normal layout-aware chunk
                     yield Chunk(
-                        id=self._hash_content(text),
+                        id=self._hash_content(buffer_text),
                         document_id=document.id,
-                        content=text,
+                        content=buffer_text,
                         metadata={
                             **document.metadata,
                             "chunk_index": chunk_index,
@@ -139,6 +154,28 @@ class LayoutAwareChunker(BaseChunker):
                         }
                     )
                     chunk_index += 1
+                buffer_text = ""
+
+            for docling_chunk in chunk_iter:
+                text = docling_chunk.text
+                
+                if not text or not text.strip():
+                    continue
+                
+                # We accumulate chunks until we hit the target size.
+                # Small chunks (like headers) will naturally bind to their 
+                # subsequent paragraphs, providing excellent context.
+                
+                if buffer_text:
+                    buffer_text += "\n\n" + text
+                else:
+                    buffer_text = text
+                
+                # Yield when we reach the target chunk size
+                if len(buffer_text) >= self.target_chunk_size:
+                    yield from flush_buffer()
+                    
+            yield from flush_buffer()
                     
         except Exception as e:
             logger.error(f"Failed to chunk document {document.id}: {e}", exc_info=True)

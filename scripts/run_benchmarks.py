@@ -133,8 +133,8 @@ def calculate_cost(latency_mean_ms):
     sec_per_1k = (latency_mean_ms / 1000.0) * 1000
     return sec_per_1k * cost_per_sec
 
-async def run_alpha_sweep(data_file: str, collection_name: str, retriever):
-    logger.info(f"Running Alpha Sweep on {data_file} for collection {collection_name}")
+async def run_alpha_sweep(data_file: str, collection_name: str, retriever, iterations: int = 1):
+    logger.info(f"Running Alpha Sweep on {data_file} for collection {collection_name} ({iterations} iterations)")
     
     if not os.path.exists(data_file):
         raise FileNotFoundError(f"Missing {data_file}.")
@@ -144,95 +144,98 @@ async def run_alpha_sweep(data_file: str, collection_name: str, retriever):
         
     queries = [q for q in queries if q.get("query_type") == "standard"]
     
-    alpha_metrics = {round(a, 1): {"recalls": [], "ndcgs": [], "latencies": []} for a in np.arange(0.0, 1.1, 0.1)}
+    alpha_metrics = {round(a, 1): {"recalls": [], "ndcgs": [], "latencies": [], "fusion_latencies": []} for a in np.arange(0.0, 1.1, 0.1)}
     
     from qdrant_client.http import models
-    for q in tqdm(queries, desc="Alpha Sweep"):
-        query_text = q["query"]
-        target_id = str(q["positive_chunk"]["chunk_id"])
-        hard_neg_ids = [str(hn["chunk_id"]) for hn in q.get("hard_negatives", [])]
-        
-        # 1. Embed once
-        start_t = time.perf_counter()
-        if retriever._is_st:
-            dense_vector = retriever.dense_model.embed([query_text])[0]
-        else:
-            dense_vector = list(retriever.dense_model.embed([query_text]))[0]
+    for iteration in range(iterations):
+        for q in tqdm(queries, desc=f"Alpha Sweep (Iter {iteration+1}/{iterations})"):
+            query_text = q["query"]
+            target_id = str(q["positive_chunk"]["chunk_id"])
+            hard_neg_ids = [str(hn["chunk_id"]) for hn in q.get("hard_negatives", [])]
             
-        sparse_result = list(retriever.sparse_model.embed([query_text]))[0]
-        sparse_vector = models.SparseVector(
-            indices=sparse_result.indices,
-            values=sparse_result.values,
-        )
-        
-        # 2. Fetch once (limit=100)
-        batch_responses = await asyncio.to_thread(
-            retriever.client.query_batch_points,
-            collection_name=retriever.collection_name,
-            requests=[
-                models.QueryRequest(query=dense_vector, using="", limit=100, with_payload=True),
-                models.QueryRequest(query=sparse_vector, using="bm25", limit=100, with_payload=True)
-            ]
-        )
-        
-        dense_response = batch_responses[0]
-        sparse_response = batch_responses[1]
-        
-        # 3. Normalize scores
-        def normalize_scores(points):
-            if not points: return {}
-            scores = {str(p.id): p.score for p in points}
-            min_val = min(scores.values())
-            max_val = max(scores.values())
-            if max_val == min_val: return {k: 0.0 for k in scores}
-            return {k: (v - min_val) / (max_val - min_val) for k, v in scores.items()}
-
-        norm_dense = normalize_scores(dense_response.points)
-        norm_sparse = normalize_scores(sparse_response.points)
-        all_points = {str(p.id): p for p in list(dense_response.points) + list(sparse_response.points)}
-        
-        base_latency = time.perf_counter() - start_t
-        
-        for alpha in np.arange(0.0, 1.1, 0.1):
-            alpha = round(alpha, 1)
-            
-            # Combine and sort
-            start_fuse_t = time.perf_counter()
-            combined = []
-            for cid in all_points.keys():
-                d_score = norm_dense.get(cid, 0.0)
-                s_score = norm_sparse.get(cid, 0.0)
-                final_score = (alpha * d_score) + ((1 - alpha) * s_score)
-                combined.append((cid, final_score))
-                
-            combined.sort(key=lambda x: x[1], reverse=True)
-            final_top_20 = [x[0] for x in combined[:20]]
-            
-            latency = base_latency + (time.perf_counter() - start_fuse_t)
-            
-            if target_id in final_top_20:
-                alpha_metrics[alpha]["recalls"].append(1.0)
+            # 1. Embed once
+            start_t = time.perf_counter()
+            if retriever._is_st:
+                dense_vector = retriever.dense_model.embed([query_text])[0]
             else:
-                alpha_metrics[alpha]["recalls"].append(0.0)
+                dense_vector = list(retriever.dense_model.embed([query_text]))[0]
+            
+            sparse_result = list(retriever.sparse_model.embed([query_text]))[0]
+            sparse_vector = models.SparseVector(
+                indices=sparse_result.indices,
+                values=sparse_result.values,
+            )
+            
+            # 2. Fetch once (limit=100)
+            batch_responses = await asyncio.to_thread(
+                retriever.client.query_batch_points,
+                collection_name=retriever.collection_name,
+                requests=[
+                    models.QueryRequest(query=dense_vector, using="", limit=100, with_payload=True),
+                    models.QueryRequest(query=sparse_vector, using="bm25", limit=100, with_payload=True)
+                ]
+            )
+            
+            dense_response = batch_responses[0]
+            sparse_response = batch_responses[1]
+            
+            # 3. Normalize scores
+            def normalize_scores(points):
+                if not points: return {}
+                scores = [p.score for p in points]
+                min_s, max_s = min(scores), max(scores)
+                if max_s - min_s == 0: return {str(p.id): 1.0 for p in points}
+                return {str(p.id): (p.score - min_s) / (max_s - min_s) for p in points}
+
+            norm_dense = normalize_scores(dense_response.points)
+            norm_sparse = normalize_scores(sparse_response.points)
+            all_points = {str(p.id): p for p in list(dense_response.points) + list(sparse_response.points)}
+            
+            base_latency = time.perf_counter() - start_t
+            
+            for alpha in np.arange(0.0, 1.1, 0.1):
+                alpha = round(alpha, 1)
                 
-            ndcg_val = calculate_ndcg(final_top_20, target_id, hard_neg_ids, k=10)
-            alpha_metrics[alpha]["ndcgs"].append(ndcg_val)
-            alpha_metrics[alpha]["latencies"].append(latency)
+                # Combine and sort
+                start_fuse_t = time.perf_counter()
+                combined = []
+                for cid in all_points.keys():
+                    d_score = norm_dense.get(cid, 0.0)
+                    s_score = norm_sparse.get(cid, 0.0)
+                    final_score = (alpha * d_score) + ((1 - alpha) * s_score)
+                    combined.append((cid, final_score))
+                    
+                combined.sort(key=lambda x: x[1], reverse=True)
+                final_top_20 = [x[0] for x in combined[:20]]
                 
-    print("\n" + "="*85)
+                fusion_latency_ms = (time.perf_counter() - start_fuse_t) * 1000
+                latency = base_latency + (time.perf_counter() - start_fuse_t)
+                
+                if target_id in final_top_20:
+                    alpha_metrics[alpha]["recalls"].append(1.0)
+                else:
+                    alpha_metrics[alpha]["recalls"].append(0.0)
+                    
+                ndcg_val = calculate_ndcg(final_top_20, target_id, hard_neg_ids, k=10)
+                alpha_metrics[alpha]["ndcgs"].append(ndcg_val)
+                alpha_metrics[alpha]["latencies"].append(latency)
+                alpha_metrics[alpha]["fusion_latencies"].append(fusion_latency_ms)
+                
+    print("\n" + "="*95)
     print("ALPHA SWEEP RESULTS")
-    print("="*85)
-    format_str = "{:<25} | {:<10} | {:<10} | {:<10} | {:<10}"
-    print(format_str.format("Alpha (Dense Weight)", "Recall@20", "nDCG@10", "p95 (ms)", "p99 (ms)"))
-    print("-" * 85)
+    print("="*95)
+    format_str = "{:<25} | {:<10} | {:<10} | {:<10} | {:<10} | {:<12}"
+    print(format_str.format("Alpha (Dense Weight)", "Recall@20", "nDCG@10", "p95 (ms)", "p99 (ms)", "Fusion (ms)"))
+    print("-" * 95)
     for alpha in sorted(alpha_metrics.keys()):
         m = alpha_metrics[alpha]
         avg_recall = np.mean(m["recalls"]) if m["recalls"] else 0.0
         avg_ndcg = np.mean(m["ndcgs"]) if m["ndcgs"] else 0.0
         p95 = np.percentile(m["latencies"], 95) * 1000 if m["latencies"] else 0.0
         p99 = np.percentile(m["latencies"], 99) * 1000 if m["latencies"] else 0.0
-        print(format_str.format(f"{alpha:.1f}", f"{avg_recall:.4f}", f"{avg_ndcg:.4f}", f"{p95:.1f}", f"{p99:.1f}"))
-    print("="*85)
+        avg_fusion = np.mean(m["fusion_latencies"]) if "fusion_latencies" in m and m["fusion_latencies"] else 0.0
+        print(format_str.format(f"{alpha:.1f}", f"{avg_recall:.4f}", f"{avg_ndcg:.4f}", f"{p95:.1f}", f"{p99:.1f}", f"{avg_fusion:.4f}"))
+    print("="*95)
 
 async def main_async():
     parser = argparse.ArgumentParser()
@@ -240,10 +243,11 @@ async def main_async():
     parser.add_argument("--metrics-port", type=int, default=8000)
     parser.add_argument("--collection", default="arxiv_papers", help="Target collection name.")
     parser.add_argument("--alpha-sweep", action="store_true", help="Run the alpha sweep diagnostics.")
+    parser.add_argument("--iterations", type=int, default=1, help="Number of times to run the queries for robust latency measurement.")
     args = parser.parse_args()
     
     if args.alpha_sweep:
-        logger.info("Initializing HybridRetriever for Alpha Sweep...")
+        logger.info(f"Initializing HybridRetriever for Alpha Sweep ({args.iterations} iterations)...")
         from arxiv_scholar.retrieval.retrieval import HybridRetriever
         retriever = HybridRetriever(
             collection_name=args.collection,
@@ -254,7 +258,8 @@ async def main_async():
         await run_alpha_sweep(
             data_file=args.data,
             collection_name=args.collection,
-            retriever=retriever
+            retriever=retriever,
+            iterations=args.iterations
         )
         return
 
