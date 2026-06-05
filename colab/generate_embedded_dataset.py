@@ -18,6 +18,16 @@ import argparse
 import json
 import logging
 import uuid
+import sys
+import os
+
+# Ensure project root and src directories are in the Python path
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+src_dir = os.path.join(project_root, "src")
+if src_dir not in sys.path:
+    sys.path.insert(0, src_dir)
 
 from tqdm import tqdm
 
