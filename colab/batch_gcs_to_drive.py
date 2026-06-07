@@ -73,9 +73,22 @@ def run_batch(batch_index: int, batch_size: int, manifest_path: str):
             continue
         
         filename = gcs_path.split("/")[-1]
-        local_path = os.path.join(TRIAL_PDF_DIR, filename)
         
-        blob = bucket.blob(gcs_path)
+        # Manifest paths might be missing the version number (e.g., v1, v2).
+        # We search by prefix to find the exact file name in the bucket.
+        prefix = gcs_path.replace('.pdf', '')
+        blobs = list(bucket.list_blobs(prefix=prefix))
+        
+        if not blobs:
+            logger.error(f"Failed to find any version of {filename} in GCS.")
+            continue
+            
+        # Grab the latest version if multiple exist
+        blob = sorted(blobs, key=lambda b: b.name)[-1]
+        
+        local_filename = blob.name.split("/")[-1]
+        local_path = os.path.join(TRIAL_PDF_DIR, local_filename)
+        
         try:
             blob.download_to_filename(local_path)
             success_count += 1
