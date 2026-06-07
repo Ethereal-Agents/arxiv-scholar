@@ -102,12 +102,15 @@ def run_batch(batch_index: int, batch_size: int, manifest_path: str):
         
     # Run embedding script
     logger.info("Executing Document Embedding Pipeline...")
+    drive_file = os.path.join(DRIVE_OUTPUT_DIR, f"embedded_dataset_m3_batch_{batch_index}.jsonl")
     cmd = [
         sys.executable, "colab/generate_embedded_dataset.py",
         "--pdf-dir", TRIAL_PDF_DIR,
         "--output", OUTPUT_JSONL,
         "--embedding-batch-size", "128",
-        "--colab-gpu"
+        "--colab-gpu",
+        "--checkpoint-path", drive_file,
+        "--checkpoint-interval", "50"
     ]
     
     try:

@@ -49,6 +49,8 @@ def main():
     parser.add_argument("--embedding-batch-size", type=int, default=32, help="Embedding batch size")
     parser.add_argument("--append", action="store_true", help="Append to existing file instead of overwriting")
     parser.add_argument("--colab-gpu", action="store_true", help="Optimize Docling for Colab GPU (uses CUDA + 4 threads for layout detection)")
+    parser.add_argument("--checkpoint-path", type=str, default="", help="Optional path to copy the output file to periodically")
+    parser.add_argument("--checkpoint-interval", type=int, default=0, help="Number of documents between checkpoints")
     args = parser.parse_args()
 
     # --- Initialize pipeline components ---
@@ -129,6 +131,13 @@ def main():
 
             total_chunks += len(chunks)
             logger.info(f"  Written {len(chunks)} records. Running total: {total_chunks}")
+
+            if args.checkpoint_path and args.checkpoint_interval > 0:
+                if total_docs % args.checkpoint_interval == 0:
+                    logger.info(f"Checkpointing progress at doc {total_docs} to {args.checkpoint_path}")
+                    out_f.flush()
+                    import shutil
+                    shutil.copy2(args.output, args.checkpoint_path)
 
     logger.info(f"Done! {total_docs} documents → {total_chunks} embedded chunks → {args.output}")
 
