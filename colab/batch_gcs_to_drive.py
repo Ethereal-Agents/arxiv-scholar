@@ -22,7 +22,7 @@ TRIAL_PDF_DIR = "trial_pdfs"
 OUTPUT_JSONL = "data/embedded_dataset_m3.jsonl"
 DRIVE_OUTPUT_DIR = "/content/drive/MyDrive/arxiv_embeddings"
 
-def run_batch(batch_index: int, batch_size: int, manifest_path: str):
+def run_batch(start_paper: int, batch_size: int, manifest_path: str):
     logger.info(f"Loading manifest from {manifest_path}")
     if not os.path.exists(manifest_path):
         logger.error(f"Manifest not found at {manifest_path}")
@@ -31,16 +31,16 @@ def run_batch(batch_index: int, batch_size: int, manifest_path: str):
     with open(manifest_path, 'r') as f:
         manifest = json.load(f)
     
-    start_idx = batch_index * batch_size
+    start_idx = start_paper
     end_idx = min(start_idx + batch_size, len(manifest))
     batch_papers = manifest[start_idx:end_idx]
     
     logger.info("="*50)
-    logger.info(f"Starting Batch {batch_index} (Processing indices {start_idx} to {end_idx})")
+    logger.info(f"Starting Batch (Processing papers {start_idx} to {end_idx})")
     logger.info("="*50)
     
     if not batch_papers:
-        logger.warning(f"No papers found for batch {batch_index}. Total manifest size: {len(manifest)}")
+        logger.warning(f"No papers found starting at {start_paper}. Total manifest size: {len(manifest)}")
         return
 
     # Cleanup local PDF dir
@@ -102,7 +102,7 @@ def run_batch(batch_index: int, batch_size: int, manifest_path: str):
         
     # Run embedding script
     logger.info("Executing Document Embedding Pipeline...")
-    drive_file = os.path.join(DRIVE_OUTPUT_DIR, f"embedded_dataset_m3_batch_{batch_index}.jsonl")
+    drive_file = os.path.join(DRIVE_OUTPUT_DIR, f"embedded_dataset_m3_start_{start_paper}.jsonl")
     cmd = [
         sys.executable, "colab/generate_embedded_dataset.py",
         "--pdf-dir", TRIAL_PDF_DIR,
@@ -120,7 +120,7 @@ def run_batch(batch_index: int, batch_size: int, manifest_path: str):
         sys.exit(1)
     
     # Move to Google Drive
-    drive_file = os.path.join(DRIVE_OUTPUT_DIR, f"embedded_dataset_m3_batch_{batch_index}.jsonl")
+    drive_file = os.path.join(DRIVE_OUTPUT_DIR, f"embedded_dataset_m3_start_{start_paper}.jsonl")
     logger.info(f"Copying JSONL output to Google Drive: {drive_file}")
     try:
         shutil.copy2(OUTPUT_JSONL, drive_file)
@@ -134,13 +134,13 @@ def run_batch(batch_index: int, batch_size: int, manifest_path: str):
     if os.path.exists(OUTPUT_JSONL):
         os.remove(OUTPUT_JSONL)
         
-    logger.info(f"Batch {batch_index} Complete! File saved to {drive_file}")
+    logger.info(f"Batch from {start_paper} Complete! File saved to {drive_file}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run GCS download and embedding pipeline for a batch of PDFs.")
-    parser.add_argument("--batch-index", type=int, required=True, help="Batch index to process (e.g., 0, 1, 2...)")
+    parser.add_argument("--start-paper", type=int, required=True, help="Index of the starting paper (e.g., 0, 400, 800...)")
     parser.add_argument("--batch-size", type=int, default=400, help="Number of papers per batch (default 400)")
     parser.add_argument("--manifest", type=str, default=DEFAULT_MANIFEST, help="Path to manifest JSON file")
     
     args = parser.parse_args()
-    run_batch(args.batch_index, args.batch_size, args.manifest)
+    run_batch(args.start_paper, args.batch_size, args.manifest)
