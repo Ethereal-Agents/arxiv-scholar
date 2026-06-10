@@ -126,6 +126,10 @@ class LayoutAwareChunker(BaseChunker):
                 nonlocal chunk_index, buffer_text
                 if not buffer_text:
                     return
+                
+                doc_title = document.metadata.get("title", "")
+                final_text = f"{doc_title}\n\n{buffer_text}" if doc_title else buffer_text
+                
                 if len(buffer_text) > self.max_chunk_size:
                     logger.debug(
                         f"Layout block too large ({len(buffer_text)} chars). "
@@ -137,15 +141,19 @@ class LayoutAwareChunker(BaseChunker):
                         metadata=document.metadata
                     )
                     for sub_chunk in self.fallback_chunker.chunk(temp_doc):
+                        # Prepend title to every individual sub-chunk for semantic context
+                        if doc_title:
+                            sub_chunk.content = f"{doc_title}\n\n{sub_chunk.content}"
+                            sub_chunk.id = self._hash_content(sub_chunk.content)
                         sub_chunk.metadata["chunk_index"] = chunk_index
                         sub_chunk.metadata["chunking_strategy"] = "layout_aware_fallback"
                         yield sub_chunk
                         chunk_index += 1
                 else:
                     yield Chunk(
-                        id=self._hash_content(buffer_text),
+                        id=self._hash_content(final_text),
                         document_id=document.id,
-                        content=buffer_text,
+                        content=final_text,
                         metadata={
                             **document.metadata,
                             "chunk_index": chunk_index,

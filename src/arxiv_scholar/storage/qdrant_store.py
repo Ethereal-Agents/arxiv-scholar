@@ -73,22 +73,32 @@ class QdrantVectorStore(BaseVectorStore):
 
         if self.collection_name in collections:
             logger.info("Collection '%s' already exists.", self.collection_name)
-            return
-
-        self._client.create_collection(
-            collection_name=self.collection_name,
-            vectors_config=VectorParams(
-                size=dimension,
-                distance=Distance.COSINE,
-            ),
-            sparse_vectors_config={
-                "bm25": SparseVectorParams()
-            },
-        )
-        logger.info(
-            "Created collection '%s' (dim=%d, distance=COSINE).",
-            self.collection_name, dimension,
-        )
+        else:
+            self._client.create_collection(
+                collection_name=self.collection_name,
+                vectors_config=VectorParams(
+                    size=dimension,
+                    distance=Distance.COSINE,
+                ),
+                sparse_vectors_config={
+                    "bm25": SparseVectorParams()
+                },
+            )
+            logger.info(
+                "Created collection '%s' (dim=%d, distance=COSINE).",
+                self.collection_name, dimension,
+            )
+            
+        # Ensure required payload indices exist
+        info = self._client.get_collection(self.collection_name)
+        from qdrant_client.models import PayloadSchemaType
+        if not info.payload_schema or "metadata.year" not in info.payload_schema:
+            logger.info("Building payload index for 'metadata.year'...")
+            self._client.create_payload_index(
+                collection_name=self.collection_name,
+                field_name="metadata.year",
+                field_schema=PayloadSchemaType.INTEGER
+            )
 
     def upsert(
         self,
