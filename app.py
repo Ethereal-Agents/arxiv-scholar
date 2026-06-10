@@ -3,7 +3,7 @@ import asyncio
 import os
 import time
 
-from configs.config import QDRANT_HOST, QDRANT_PORT, QDRANT_COLLECTION, RERANKER_MODEL
+from configs.config import AppConfig
 from arxiv_scholar.retrieval.orchestrator import Orchestrator
 from arxiv_scholar.llm.service import LLMService
 
@@ -51,14 +51,26 @@ st.markdown("""
 
 @st.cache_resource
 def load_backend():
+    config = AppConfig()
     orchestrator = Orchestrator(
-        collection_name=QDRANT_COLLECTION,
-        qdrant_host=QDRANT_HOST,
-        qdrant_port=QDRANT_PORT,
-        reranker_model_name=RERANKER_MODEL
+        collection_name=config.qdrant_collection,
+        qdrant_host=config.qdrant_host,
+        qdrant_port=config.qdrant_port,
+        qdrant_url=config.qdrant_url,
+        qdrant_api_key=config.qdrant_api_key,
+        dense_model_name=config.embedding_model,
+        sparse_model_name=config.sparse_embedding_model,
+        reranker_model_name=config.reranker_model,
+        use_reranker=config.use_reranker,
+        reranker_truncation_length=config.reranker_truncation_length,
+        reranker_fetch_multiplier=config.reranker_fetch_multiplier,
+        llm_api_key=config.llm_api_key,
+        llm_base_url=config.llm_base_url,
+        llm_model=config.llm_model
     )
-    llm_service = LLMService()
-    return orchestrator, llm_service
+    # LLMService is initialized inside Orchestrator, so we don't need to instantiate it separately here if we don't want to.
+    # But wait, app.py uses llm_service directly.
+    return orchestrator, orchestrator.llm_service
 
 try:
     orchestrator, llm_service = load_backend()
@@ -120,7 +132,7 @@ if prompt := st.chat_input("What is the impact of dropout on transformers?"):
         
         # 1. Retrieval & Re-ranking
         try:
-            chunks = asyncio.run(orchestrator.retrieve(prompt, limit=5, use_reranker=True))
+            chunks = asyncio.run(orchestrator.retrieve(prompt, limit=5))
             st.session_state.latest_sources = chunks
         except Exception as e:
             status_placeholder.error(f"Retrieval failed: {e}")
@@ -147,10 +159,9 @@ if prompt := st.chat_input("What is the impact of dropout on transformers?"):
             stream = llm_service.stream_synthesis(prompt, context_str)
             full_response = ""
             try:
-                async for chunk in stream:
-                    content = chunk.choices[0].delta.content
-                    if content:
-                        full_response += content
+                async for token in stream:
+                    if token:
+                        full_response += token
                         # Typing effect with cursor
                         response_placeholder.markdown(full_response + "▌")
             except Exception as e:

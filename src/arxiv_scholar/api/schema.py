@@ -1,11 +1,12 @@
 from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Dict, Any
-from configs.config import USE_RERANKER
+
 
 class QueryRequest(BaseModel):
     query: str
     limit: int = 5
-    use_reranker: bool = USE_RERANKER
+    use_reranker: bool = Field(default=False, description="Whether to apply BGE Cross-Encoder re-ranking")
 
 class SourceNode(BaseModel):
     chunk_id: str

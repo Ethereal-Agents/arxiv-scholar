@@ -1,33 +1,37 @@
 import os
-from pathlib import Path
+from dataclasses import dataclass, field
 
-# Base directory of the repository (arxiv-scholar)
-BASE_DIR = Path(__file__).resolve().parent.parent
+@dataclass
+class AppConfig:
+    # LLM configurations
+    llm_base_url: str = field(default_factory=lambda: os.getenv("LLM_BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai/"))
+    llm_api_key: str = field(default_factory=lambda: os.getenv("LLM_API_KEY") or os.getenv("GEMINI_API_KEY", ""))
+    llm_model: str = field(default_factory=lambda: os.getenv("LLM_MODEL", "gemma-4-31b-it"))
+    
+    # Embedding configurations
+    embedding_backend: str = field(default_factory=lambda: os.getenv("EMBEDDING_BACKEND", "fastembed"))
+    embedding_model: str = field(default_factory=lambda: os.getenv("EMBEDDING_MODEL", "BAAI/bge-m3"))
+    sparse_embedding_model: str = field(default_factory=lambda: os.getenv("SPARSE_EMBEDDING_MODEL", "Qdrant/bm25"))
+    embedding_batch_size: int = field(default_factory=lambda: int(os.getenv("EMBEDDING_BATCH_SIZE", "32")))
+    embedding_device: str = field(default_factory=lambda: os.getenv("EMBEDDING_DEVICE", "auto"))
 
-# Centralized configurations for the download/ingestion module
-DOWNLOAD_DIR = os.getenv("DOWNLOAD_DIR", str(BASE_DIR / "arxiv_batch"))
-STATE_FILE = os.getenv("STATE_FILE", "ingestion_state.json")
-GCS_BUCKET_NAME = os.getenv("GCS_BUCKET_NAME", "arxiv-dataset")
-GCS_BASE_PREFIX = os.getenv("GCS_BASE_PREFIX", "arxiv/arxiv/pdf/")
+    # Qdrant storage configuration
+    qdrant_url: str = field(default_factory=lambda: os.getenv("QDRANT_URL", ""))
+    qdrant_api_key: str = field(default_factory=lambda: os.getenv("QDRANT_API_KEY", ""))
+    qdrant_host: str = field(default_factory=lambda: os.getenv("QDRANT_HOST", "localhost"))
+    qdrant_port: int = field(default_factory=lambda: int(os.getenv("QDRANT_PORT", "6333")))
+    qdrant_collection: str = field(default_factory=lambda: os.getenv("QDRANT_COLLECTION", "arxiv-scholar"))
 
-# Embedding configuration
-EMBEDDING_BACKEND = os.getenv("EMBEDDING_BACKEND", "sentence-transformers")
-EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "BAAI/bge-m3")
-SPARSE_EMBEDDING_MODEL = os.getenv("SPARSE_EMBEDDING_MODEL", "Qdrant/bm25")
-USE_RERANKER = os.getenv("USE_RERANKER", "False").lower() in ("true", "1", "t")
-RERANKER_MODEL = os.getenv("RERANKER_MODEL", "BAAI/bge-reranker-base")
-RERANKER_TRUNCATION_LENGTH = int(os.getenv("RERANKER_TRUNCATION_LENGTH", "2000"))
-RERANKER_FETCH_MULTIPLIER = int(os.getenv("RERANKER_FETCH_MULTIPLIER", "5"))
-EMBEDDING_BATCH_SIZE = int(os.getenv("EMBEDDING_BATCH_SIZE", "32"))
-EMBEDDING_DEVICE = os.getenv("EMBEDDING_DEVICE", "auto")
+    # Retrieval & Reranker Configuration
+    use_reranker: bool = field(default_factory=lambda: os.getenv("USE_RERANKER", "False").lower() == "true")
+    reranker_model: str = field(default_factory=lambda: os.getenv("RERANKER_MODEL", "jina-reranker-v1-tiny-en"))
+    reranker_truncation_length: int = field(default_factory=lambda: int(os.getenv("RERANKER_TRUNCATION_LENGTH", "8192")))
+    reranker_fetch_multiplier: int = field(default_factory=lambda: int(os.getenv("RERANKER_FETCH_MULTIPLIER", "4")))
+    
+    # Hybrid fusion weights
+    dense_weight: float = field(default_factory=lambda: float(os.getenv("DENSE_WEIGHT", "1.0")))
+    sparse_weight: float = field(default_factory=lambda: float(os.getenv("SPARSE_WEIGHT", "0.3")))
 
-# Qdrant storage configuration
-QDRANT_URL = os.getenv("QDRANT_URL", None)
-QDRANT_API_KEY = os.getenv("QDRANT_API_KEY", None)
-QDRANT_HOST = os.getenv("QDRANT_HOST", "localhost")
-QDRANT_PORT = int(os.getenv("QDRANT_PORT", "6333"))
-QDRANT_COLLECTION = os.getenv("QDRANT_COLLECTION", "arxiv_papers_m3")
-
-# Hybrid Search Fusion Weights
-DENSE_WEIGHT = float(os.getenv("DENSE_WEIGHT", "0.6"))
-SPARSE_WEIGHT = float(os.getenv("SPARSE_WEIGHT", "0.4"))
+    # Paths
+    download_dir: str = field(default_factory=lambda: os.getenv("DOWNLOAD_DIR", "data/papers"))
+    state_file: str = field(default_factory=lambda: os.getenv("STATE_FILE", "data/pipeline_state.json"))

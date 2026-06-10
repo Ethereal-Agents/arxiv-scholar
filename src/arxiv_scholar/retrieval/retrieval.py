@@ -12,20 +12,6 @@ from qdrant_client import models
 from fastembed import TextEmbedding, SparseTextEmbedding
 from fastembed.rerank.cross_encoder import TextCrossEncoder
 
-from configs.config import (
-    QDRANT_HOST,
-    QDRANT_PORT,
-    QDRANT_COLLECTION,
-    EMBEDDING_MODEL,
-    SPARSE_EMBEDDING_MODEL,
-    RERANKER_MODEL,
-    RERANKER_TRUNCATION_LENGTH,
-    RERANKER_FETCH_MULTIPLIER,
-    DENSE_WEIGHT,
-    SPARSE_WEIGHT,
-    USE_RERANKER,
-)
-
 logger = logging.getLogger(__name__)
 
 class HybridRetriever:
@@ -33,13 +19,18 @@ class HybridRetriever:
 
     def __init__(
         self,
-        collection_name: str = QDRANT_COLLECTION,
-        qdrant_host: str = QDRANT_HOST,
-        qdrant_port: int = QDRANT_PORT,
+        collection_name: str = "arxiv-scholar",
+        qdrant_host: str = "localhost",
+        qdrant_port: int = 6333,
+        qdrant_url: str = "",
+        qdrant_api_key: str = "",
         location: str = None,
-        dense_model_name: str = EMBEDDING_MODEL,
-        sparse_model_name: str = SPARSE_EMBEDDING_MODEL,
-        reranker_model_name: str = RERANKER_MODEL,
+        dense_model_name: str = "BAAI/bge-m3",
+        sparse_model_name: str = "Qdrant/bm25",
+        reranker_model_name: str = "jina-reranker-v1-tiny-en",
+        use_reranker: bool = False,
+        reranker_truncation_length: int = 8192,
+        reranker_fetch_multiplier: int = 4
     ) -> None:
         """Initializes the retriever and its global state (models and db client)."""
         self.collection_name = collection_name
@@ -47,6 +38,8 @@ class HybridRetriever:
         # 1. Initialize the Qdrant client
         if location:
             self.client = QdrantClient(location=location)
+        elif qdrant_url and qdrant_api_key:
+            self.client = QdrantClient(url=qdrant_url, api_key=qdrant_api_key)
         else:
             self.client = QdrantClient(host=qdrant_host, port=qdrant_port)
             
@@ -54,6 +47,18 @@ class HybridRetriever:
 
         # 2. Initialize two fastembed models (Dense and Sparse).
         # These are loaded globally for the instance and cached.
+        # Initialize fastembed models FIRST to prevent ONNX/PyTorch deadlocks on Mac
+        logger.info(f"Loading sparse model: {sparse_model_name}")
+        self.sparse_model = SparseTextEmbedding(model_name=sparse_model_name)
+        
+        self.reranker_model = None
+        self.use_reranker = use_reranker
+        self.reranker_truncation_length = reranker_truncation_length
+        self.reranker_fetch_multiplier = reranker_fetch_multiplier
+        if use_reranker and reranker_model_name:
+            logger.info(f"Loading fastembed reranker model: {reranker_model_name}")
+            self.reranker_model = TextCrossEncoder(model_name=reranker_model_name)
+
         logger.info(f"Loading dense model: {dense_model_name}")
         if "bge-m3" in dense_model_name.lower():
             from arxiv_scholar.embedding.st_embedder import SentenceTransformerEmbedder
@@ -62,14 +67,6 @@ class HybridRetriever:
         else:
             self.dense_model = TextEmbedding(model_name=dense_model_name)
             self._is_st = False
-        
-        logger.info(f"Loading sparse model: {sparse_model_name}")
-        self.sparse_model = SparseTextEmbedding(model_name=sparse_model_name)
-        
-        self.reranker_model = None
-        if reranker_model_name:
-            logger.info(f"Loading fastembed reranker model: {reranker_model_name}")
-            self.reranker_model = TextCrossEncoder(model_name=reranker_model_name)
             
         # Proactively validate embedding dimension against Qdrant collection
         try:
@@ -99,7 +96,7 @@ class HybridRetriever:
                 raise
             logger.warning(f"Could not validate collection dimensions during init: {e}")
 
-    def retrieve(self, query_text: str, limit: int = 20, use_reranker: bool = USE_RERANKER, dense_query_text: str = None, filters: Dict[str, Any] = None, dense_weight: float = DENSE_WEIGHT, sparse_weight: float = SPARSE_WEIGHT) -> List[Dict[str, Any]]:
+    def retrieve(self, query_text: str, limit: int = 20, use_reranker: bool = None, dense_query_text: str = None, filters: Dict[str, Any] = None, dense_weight: float = 1.0, sparse_weight: float = 0.3) -> List[Dict[str, Any]]:
         """Executes a hybrid search query with server-side RRF.
         
         Args:
@@ -112,6 +109,9 @@ class HybridRetriever:
         Returns:
             A list of dictionaries containing chunk_id, text, score, and metadata.
         """
+        if use_reranker is None:
+            use_reranker = self.use_reranker
+            
         # 3. Generate the Dense vector for the query_text.
         # fastembed returns generators, so we consume it into a list and take the first item
         dq = dense_query_text if dense_query_text else query_text
@@ -151,7 +151,7 @@ class HybridRetriever:
             if must_conditions:
                 qdrant_filter = models.Filter(must=must_conditions)
 
-        fetch_limit = limit * RERANKER_FETCH_MULTIPLIER if (use_reranker and self.reranker_model) else limit
+        fetch_limit = limit * self.reranker_fetch_multiplier if (use_reranker and self.reranker_model) else limit
         
         # 6. Fetch independently and fuse manually with Min-Max normalization
         # We batch both queries into a single network round-trip to minimize latency
@@ -221,7 +221,7 @@ class HybridRetriever:
             return results[:limit]
             
         # Predict cross-encoder scores
-        documents = [res["text"][:RERANKER_TRUNCATION_LENGTH] for res in results]
+        documents = [res["text"][:self.reranker_truncation_length] for res in results]
         cross_scores = list(self.reranker_model.rerank(query_text, documents))
         
         # Update scores and sort descending

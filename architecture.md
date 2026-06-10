@@ -26,7 +26,7 @@ flowchart TD
     E -.->|Dense Vector| J(Hybrid Search)
     F -.->|Sparse Vector| J
     J -.->|Prefetch & Fusion| G
-    G -->|RRF Ranked Results (Top 100)| L(Jina Cross-Encoder Reranker)
+    G -->|RRF Ranked Results (Top 100)| L(BGE Cross-Encoder Reranker)
     L -->|Final Reranked Results (Top 20)| K[Final Context]
 ```
 
@@ -53,7 +53,7 @@ The core vector database wrapper built around `qdrant-client`.
 - **Hybrid Search**: Performs retrieval utilizing a combination of prefetching dense vectors and sparse vectors simultaneously.
 - **Reciprocal Rank Fusion (RRF)**: Merges the scores of the exact keyword matching and semantic matching, returning the highest-ranked 100 chunks.
 
-### 7. Jina Cross-Encoder Reranker
-A lightweight ONNX CPU-optimized Cross-Encoder (`jina-reranker-v1-tiny-en`).
+### 7. BGE Cross-Encoder Reranker
+A lightweight ONNX CPU-optimized Cross-Encoder (`BAAI/bge-reranker-base`).
 - Takes the Top 100 results from Qdrant, truncates them to 500 characters, and performs a secondary cross-attention scoring against the user query.
 - Re-sorts the results to drastically improve precision and Recall@20 before yielding the final Top 20 context.
