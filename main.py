@@ -2,7 +2,7 @@ import os
 import argparse
 import logging
 
-from configs import config
+from configs.config import AppConfig
 from arxiv_scholar.download.arxiv_ingestion import ArxivUnifiedEngine
 from arxiv_scholar.ingestion.local import LocalDirectoryReader
 from arxiv_scholar.chunking.layout import LayoutAwareChunker
@@ -22,39 +22,43 @@ class PipelineOrchestrator:
         # Override config paths for sandboxing/trials
         os.environ["DOWNLOAD_DIR"] = download_dir
         os.environ["STATE_FILE"] = state_file
-        config.DOWNLOAD_DIR = download_dir
-        config.STATE_FILE = state_file
+        self.config = AppConfig()
+        self.config.download_dir = download_dir
+        self.config.state_file = state_file
         
         self.engine = ArxivUnifiedEngine()
         self.chunker = LayoutAwareChunker(max_chunk_size=2000)
         
-        if config.EMBEDDING_BACKEND == "fastembed":
+        if self.config.embedding_backend == "fastembed":
             self.embedder = FastEmbedEmbedder(
-                model_name=config.EMBEDDING_MODEL,
-                batch_size=config.EMBEDDING_BATCH_SIZE,
+                model_name=self.config.embedding_model,
+                batch_size=self.config.embedding_batch_size,
             )
         else:
             self.embedder = SentenceTransformerEmbedder(
-                model_name=config.EMBEDDING_MODEL,
-                device=config.EMBEDDING_DEVICE,
-                batch_size=config.EMBEDDING_BATCH_SIZE,
+                model_name=self.config.embedding_model,
+                device=self.config.embedding_device,
+                batch_size=self.config.embedding_batch_size,
             )
 
-        self.sparse_embedder = SparseBM25Embedder(batch_size=config.EMBEDDING_BATCH_SIZE)
+        self.sparse_embedder = SparseBM25Embedder(
+            model_name=self.config.sparse_embedding_model,
+            batch_size=self.config.embedding_batch_size
+        )
 
         # Storage
         if download_dir == "trial_batch":
             self.store = QdrantVectorStore(
-                collection_name=config.QDRANT_COLLECTION,
+                collection_name=self.config.qdrant_collection,
                 location=":memory:",
             )
         else:
             self.store = QdrantVectorStore(
-                collection_name=config.QDRANT_COLLECTION,
-                host=config.QDRANT_HOST,
-                port=config.QDRANT_PORT,
-                url=config.QDRANT_URL,
-                api_key=config.QDRANT_API_KEY,
+                collection_name=self.config.qdrant_collection,
+                host=self.config.qdrant_host,
+                port=self.config.qdrant_port,
+                url=self.config.qdrant_url,
+                api_key=self.config.qdrant_api_key,
             )
         self.store.ensure_collection(dimension=self.embedder.dimension)
 
@@ -70,7 +74,7 @@ class PipelineOrchestrator:
         logger.info(f"Downloaded {len(paths)} PDFs.")
         
         # Instantiate reader to scan the download directory
-        reader = LocalDirectoryReader(directory_path=config.DOWNLOAD_DIR)
+        reader = LocalDirectoryReader(directory_path=self.config.download_dir)
         
         total_chunks = 0
         total_embedded = 0
@@ -131,6 +135,7 @@ if __name__ == "__main__":
         orchestrator = PipelineOrchestrator(download_dir="trial_batch", state_file="trial_state.json")
         orchestrator.run(max_batches=1, batch_size=2)
     else:
-        orchestrator = PipelineOrchestrator(download_dir=config.DOWNLOAD_DIR, state_file=config.STATE_FILE)
+        base_config = AppConfig()
+        orchestrator = PipelineOrchestrator(download_dir=base_config.download_dir, state_file=base_config.state_file)
         # Infinite loop for production backfill
         orchestrator.run(batch_size=50)

@@ -14,7 +14,7 @@ from arxiv_scholar.api.schema import (
     StreamTokenEvent, 
     StreamDoneEvent
 )
-from configs.config import QDRANT_HOST, QDRANT_PORT, QDRANT_COLLECTION, RERANKER_MODEL
+from configs.config import AppConfig
 
 logger = logging.getLogger(__name__)
 
@@ -25,17 +25,26 @@ app_state = {}
 async def lifespan(app: FastAPI):
     # Startup
     logger.info("Initializing Orchestrator with ML Router and BGE Re-ranker...")
+    config = AppConfig()
     orchestrator = Orchestrator(
-        collection_name=QDRANT_COLLECTION,
-        qdrant_host=QDRANT_HOST,
-        qdrant_port=QDRANT_PORT,
-        reranker_model_name=RERANKER_MODEL
+        collection_name=config.qdrant_collection,
+        qdrant_host=config.qdrant_host,
+        qdrant_port=config.qdrant_port,
+        qdrant_url=config.qdrant_url,
+        qdrant_api_key=config.qdrant_api_key,
+        dense_model_name=config.embedding_model,
+        sparse_model_name=config.sparse_embedding_model,
+        reranker_model_name=config.reranker_model,
+        use_reranker=config.use_reranker,
+        reranker_truncation_length=config.reranker_truncation_length,
+        reranker_fetch_multiplier=config.reranker_fetch_multiplier,
+        llm_api_key=config.llm_api_key,
+        llm_base_url=config.llm_base_url,
+        llm_model=config.llm_model
     )
     
-    llm_service = LLMService()
-    
     app_state["orchestrator"] = orchestrator
-    app_state["llm_service"] = llm_service
+    app_state["llm_service"] = orchestrator.llm_service
     
     yield
     

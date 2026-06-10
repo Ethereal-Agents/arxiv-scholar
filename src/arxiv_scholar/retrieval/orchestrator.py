@@ -8,47 +8,58 @@ from arxiv_scholar.llm.service import LLMService
 
 from arxiv_scholar.retrieval.retrieval import HybridRetriever
 from arxiv_scholar.retrieval.router import Route, MLQueryRouter
-from configs.config import (
-    QDRANT_HOST,
-    QDRANT_PORT,
-    QDRANT_COLLECTION,
-    EMBEDDING_MODEL,
-    SPARSE_EMBEDDING_MODEL,
-    RERANKER_MODEL,
-    RERANKER_FETCH_MULTIPLIER,
-    USE_RERANKER,
-)
+
 
 logger = logging.getLogger(__name__)
 
 class Orchestrator:
     def __init__(
         self,
-        collection_name: str = QDRANT_COLLECTION,
-        qdrant_host: str = QDRANT_HOST,
-        qdrant_port: int = QDRANT_PORT,
-        dense_model_name: str = EMBEDDING_MODEL,
-        sparse_model_name: str = SPARSE_EMBEDDING_MODEL,
-        reranker_model_name: str = RERANKER_MODEL,
+        collection_name: str = "arxiv-scholar",
+        qdrant_host: str = "localhost",
+        qdrant_port: int = 6333,
+        qdrant_url: str = "",
+        qdrant_api_key: str = "",
+        dense_model_name: str = "BAAI/bge-m3",
+        sparse_model_name: str = "Qdrant/bm25",
+        reranker_model_name: str = "jina-reranker-v1-tiny-en",
+        use_reranker: bool = False,
+        reranker_truncation_length: int = 8192,
+        reranker_fetch_multiplier: int = 4,
+        llm_api_key: str = "",
+        llm_base_url: str = "",
+        llm_model: str = ""
     ):
         self.collection_name = collection_name
+        self.use_reranker = use_reranker
+        self.reranker_fetch_multiplier = reranker_fetch_multiplier
         
         self.retriever = HybridRetriever(
             collection_name=collection_name,
             qdrant_host=qdrant_host,
             qdrant_port=qdrant_port,
+            qdrant_url=qdrant_url,
+            qdrant_api_key=qdrant_api_key,
             dense_model_name=dense_model_name,
             sparse_model_name=sparse_model_name,
             reranker_model_name=reranker_model_name,
+            use_reranker=use_reranker,
+            reranker_truncation_length=reranker_truncation_length,
+            reranker_fetch_multiplier=reranker_fetch_multiplier
         )
         
         # Initialize ML router
         self.router = MLQueryRouter()
         
         # Initialize LLM Service
-        self.llm_service = LLMService()
+        self.llm_service = LLMService(
+            api_key=llm_api_key,
+            base_url=llm_base_url,
+            model=llm_model
+        )
 
-    async def retrieve(self, query: str, limit: int = 20, use_reranker: bool = USE_RERANKER) -> List[Dict[str, Any]]:
+    async def retrieve(self, query: str, limit: int = 20, use_reranker: bool = None) -> List[Dict[str, Any]]:
+        if use_reranker is None: use_reranker = self.use_reranker
         logger.info(f"Orchestrator.retrieve called with query: '{query}', limit={limit}, use_reranker={use_reranker}")
         # Compute dense embedding to feed to the ML router
         dense_out = list(self.retriever.dense_model.embed([query]))[0]
@@ -76,10 +87,12 @@ class Orchestrator:
             
         return results
 
-    async def _execute_direct(self, query: str, limit: int = 20, use_reranker: bool = USE_RERANKER, filters: Dict[str, Any] = None) -> List[Dict[str, Any]]:
+    async def _execute_direct(self, query: str, limit: int = 20, use_reranker: bool = None, filters: Dict[str, Any] = None) -> List[Dict[str, Any]]:
+        if use_reranker is None: use_reranker = self.use_reranker
         return await asyncio.to_thread(self.retriever.retrieve, query, limit, use_reranker, None, filters)
 
-    async def _execute_hyde(self, query: str, limit: int = 20, use_reranker: bool = USE_RERANKER) -> List[Dict[str, Any]]:
+    async def _execute_hyde(self, query: str, limit: int = 20, use_reranker: bool = None) -> List[Dict[str, Any]]:
+        if use_reranker is None: use_reranker = self.use_reranker
         # 1. Generate hypothetical abstract via API
         abstract = await self.llm_service.generate_hyde_abstract(query)
         logger.info(f"Generated HyDE abstract: '{abstract[:100]}...'")
@@ -87,7 +100,8 @@ class Orchestrator:
         # 2. Hybrid search (Dense uses abstract, Sparse uses original query)
         return await asyncio.to_thread(self.retriever.retrieve, query, limit, use_reranker, abstract)
 
-    async def _execute_decompose(self, query: str, limit: int = 20, use_reranker: bool = USE_RERANKER) -> List[Dict[str, Any]]:
+    async def _execute_decompose(self, query: str, limit: int = 20, use_reranker: bool = None) -> List[Dict[str, Any]]:
+        if use_reranker is None: use_reranker = self.use_reranker
         if not self.llm_service.client:
             logger.warning("No LLM client configured for DECOMPOSE. Falling back to DIRECT.")
             return await self._execute_direct(query, limit, use_reranker)
@@ -109,7 +123,7 @@ class Orchestrator:
             
         # 2. Dynamic Compute Budgeting
         # Allocate the global cross-encoder budget equally across sub-queries
-        global_budget = limit * RERANKER_FETCH_MULTIPLIER if use_reranker else limit
+        global_budget = limit * self.reranker_fetch_multiplier if use_reranker else limit
         sub_limit = max(limit, global_budget // len(sub_queries))
             
         # 3. Fire concurrent searches for each sub-query (force use_reranker=False)
