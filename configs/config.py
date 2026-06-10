@@ -20,7 +20,7 @@ class AppConfig:
     qdrant_api_key: str = field(default_factory=lambda: os.getenv("QDRANT_API_KEY", ""))
     qdrant_host: str = field(default_factory=lambda: os.getenv("QDRANT_HOST", "localhost"))
     qdrant_port: int = field(default_factory=lambda: int(os.getenv("QDRANT_PORT", "6333")))
-    qdrant_collection: str = field(default_factory=lambda: os.getenv("QDRANT_COLLECTION", "arxiv-scholar"))
+    qdrant_collection: str = field(default_factory=lambda: os.getenv("QDRANT_COLLECTION", "Arxiv-Scholar"))
 
     # Retrieval & Reranker Configuration
     use_reranker: bool = field(default_factory=lambda: os.getenv("USE_RERANKER", "False").lower() == "true")
