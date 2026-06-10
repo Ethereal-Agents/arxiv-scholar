@@ -7,10 +7,10 @@ from openai import AsyncOpenAI
 logger = logging.getLogger(__name__)
 
 class LLMService:
-    def __init__(self, api_key: str = None, base_url: str = "https://openrouter.ai/api/v1", model: str = "anthropic/claude-3.5-haiku"):
-        self.api_key = api_key or os.environ.get("OPENROUTER_API_KEY", "")
-        self.base_url = base_url
-        self.model = model
+    def __init__(self, api_key: str = None, base_url: str = None, model: str = None):
+        self.api_key = api_key or os.environ.get("LLM_API_KEY") or os.environ.get("GEMINI_API_KEY", "")
+        self.base_url = base_url or os.environ.get("LLM_BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai/")
+        self.model = model or os.environ.get("LLM_MODEL", "gemma-4-31b-it")
         
         if self.api_key:
             self.client = AsyncOpenAI(
@@ -93,7 +93,7 @@ class LLMService:
             logger.error(f"Failed to parse LLM JSON for decomposition: {e} | Content: {content}")
             return {"sub_queries": [query]}
 
-    async def stream_synthesis(self, query: str, context: str) -> AsyncGenerator[Any, None]:
+    async def stream_synthesis(self, query: str, context: str) -> AsyncGenerator[str, None]:
         if not self.client:
             raise ValueError("LLM client not initialized.")
             
@@ -116,5 +116,63 @@ Query: {query}
             stream=True
         )
         
+        in_thought = False
+        buffer = ""
+        
         async for chunk in stream:
-            yield chunk
+            content = chunk.choices[0].delta.content
+            if not content:
+                continue
+                
+            buffer += content
+            
+            # Simple state machine to hide <thought> tags from the UI
+            while True:
+                if not in_thought:
+                    if "<thought>" in buffer:
+                        idx = buffer.find("<thought>")
+                        if idx > 0:
+                            yield buffer[:idx]
+                        buffer = buffer[idx + len("<thought>"):]
+                        in_thought = True
+                    else:
+                        split_idx = buffer.find("<")
+                        if split_idx == -1:
+                            yield buffer
+                            buffer = ""
+                            break
+                        else:
+                            if split_idx > 0:
+                                yield buffer[:split_idx]
+                            buffer = buffer[split_idx:]
+                            if len(buffer) < len("<thought>"):
+                                if "<thought>".startswith(buffer):
+                                    break # Wait for more chunks to resolve the tag
+                                else:
+                                    yield buffer[0]
+                                    buffer = buffer[1:]
+                            else:
+                                yield buffer[0]
+                                buffer = buffer[1:]
+                else:
+                    if "</thought>" in buffer:
+                        idx = buffer.find("</thought>")
+                        buffer = buffer[idx + len("</thought>"):]
+                        in_thought = False
+                    else:
+                        split_idx = buffer.find("<")
+                        if split_idx == -1:
+                            buffer = ""
+                            break
+                        else:
+                            buffer = buffer[split_idx:]
+                            if len(buffer) < len("</thought>"):
+                                if "</thought>".startswith(buffer):
+                                    break
+                                else:
+                                    buffer = buffer[1:]
+                            else:
+                                buffer = buffer[1:]
+                                
+        if buffer and not in_thought:
+            yield buffer

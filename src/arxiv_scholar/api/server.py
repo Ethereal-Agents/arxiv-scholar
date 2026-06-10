@@ -101,10 +101,9 @@ async def query_endpoint(request: QueryRequest):
                 stream = llm_service.stream_synthesis(request.query, context_str)
                 
                 # YIELD 2: Token Events
-                async for chunk in stream:
-                    content = chunk.choices[0].delta.content
-                    if content:
-                        token_event = StreamTokenEvent(content=content)
+                async for token in stream:
+                    if token:
+                        token_event = StreamTokenEvent(content=token)
                         yield f"data: {token_event.model_dump_json()}\n\n"
                         
                 logger.debug(f"LLM stream synthesis completed for query: '{request.query}'")

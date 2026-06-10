@@ -53,6 +53,8 @@ class PipelineOrchestrator:
                 collection_name=config.QDRANT_COLLECTION,
                 host=config.QDRANT_HOST,
                 port=config.QDRANT_PORT,
+                url=config.QDRANT_URL,
+                api_key=config.QDRANT_API_KEY,
             )
         self.store.ensure_collection(dimension=self.embedder.dimension)
 

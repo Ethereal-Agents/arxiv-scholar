@@ -3,7 +3,7 @@ import asyncio
 import os
 import time
 
-from configs.config import QDRANT_HOST, QDRANT_PORT, QDRANT_COLLECTION, RERANKER_MODEL
+from configs.config import QDRANT_HOST, QDRANT_PORT, QDRANT_COLLECTION, RERANKER_MODEL, USE_RERANKER
 from arxiv_scholar.retrieval.orchestrator import Orchestrator
 from arxiv_scholar.llm.service import LLMService
 
@@ -120,7 +120,7 @@ if prompt := st.chat_input("What is the impact of dropout on transformers?"):
         
         # 1. Retrieval & Re-ranking
         try:
-            chunks = asyncio.run(orchestrator.retrieve(prompt, limit=5, use_reranker=True))
+            chunks = asyncio.run(orchestrator.retrieve(prompt, limit=5, use_reranker=USE_RERANKER))
             st.session_state.latest_sources = chunks
         except Exception as e:
             status_placeholder.error(f"Retrieval failed: {e}")
@@ -147,10 +147,9 @@ if prompt := st.chat_input("What is the impact of dropout on transformers?"):
             stream = llm_service.stream_synthesis(prompt, context_str)
             full_response = ""
             try:
-                async for chunk in stream:
-                    content = chunk.choices[0].delta.content
-                    if content:
-                        full_response += content
+                async for token in stream:
+                    if token:
+                        full_response += token
                         # Typing effect with cursor
                         response_placeholder.markdown(full_response + "▌")
             except Exception as e:

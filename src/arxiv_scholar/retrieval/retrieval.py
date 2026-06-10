@@ -15,6 +15,8 @@ from fastembed.rerank.cross_encoder import TextCrossEncoder
 from configs.config import (
     QDRANT_HOST,
     QDRANT_PORT,
+    QDRANT_URL,
+    QDRANT_API_KEY,
     QDRANT_COLLECTION,
     EMBEDDING_MODEL,
     SPARSE_EMBEDDING_MODEL,
@@ -36,6 +38,8 @@ class HybridRetriever:
         collection_name: str = QDRANT_COLLECTION,
         qdrant_host: str = QDRANT_HOST,
         qdrant_port: int = QDRANT_PORT,
+        qdrant_url: str = QDRANT_URL,
+        qdrant_api_key: str = QDRANT_API_KEY,
         location: str = None,
         dense_model_name: str = EMBEDDING_MODEL,
         sparse_model_name: str = SPARSE_EMBEDDING_MODEL,
@@ -47,6 +51,8 @@ class HybridRetriever:
         # 1. Initialize the Qdrant client
         if location:
             self.client = QdrantClient(location=location)
+        elif qdrant_url and qdrant_api_key:
+            self.client = QdrantClient(url=qdrant_url, api_key=qdrant_api_key)
         else:
             self.client = QdrantClient(host=qdrant_host, port=qdrant_port)
             
@@ -54,6 +60,15 @@ class HybridRetriever:
 
         # 2. Initialize two fastembed models (Dense and Sparse).
         # These are loaded globally for the instance and cached.
+        # Initialize fastembed models FIRST to prevent ONNX/PyTorch deadlocks on Mac
+        logger.info(f"Loading sparse model: {sparse_model_name}")
+        self.sparse_model = SparseTextEmbedding(model_name=sparse_model_name)
+        
+        self.reranker_model = None
+        if USE_RERANKER and reranker_model_name:
+            logger.info(f"Loading fastembed reranker model: {reranker_model_name}")
+            self.reranker_model = TextCrossEncoder(model_name=reranker_model_name)
+
         logger.info(f"Loading dense model: {dense_model_name}")
         if "bge-m3" in dense_model_name.lower():
             from arxiv_scholar.embedding.st_embedder import SentenceTransformerEmbedder
@@ -62,14 +77,6 @@ class HybridRetriever:
         else:
             self.dense_model = TextEmbedding(model_name=dense_model_name)
             self._is_st = False
-        
-        logger.info(f"Loading sparse model: {sparse_model_name}")
-        self.sparse_model = SparseTextEmbedding(model_name=sparse_model_name)
-        
-        self.reranker_model = None
-        if reranker_model_name:
-            logger.info(f"Loading fastembed reranker model: {reranker_model_name}")
-            self.reranker_model = TextCrossEncoder(model_name=reranker_model_name)
             
         # Proactively validate embedding dimension against Qdrant collection
         try:

@@ -30,7 +30,7 @@ flowchart TD
         A[ArxivUnifiedEngine] -->|Downloads PDFs from GCS| B(LocalDirectoryReader / GCSBucketReader)
         B -->|Yields Documents| C(LayoutAwareChunker)
         C -->|Produces Chunks| D{Embedding Service}
-        D -->|Dense Vectors| E[FastEmbedEmbedder<br/><small>BAAI/bge-small-en-v1.5</small>]
+        D -->|Dense Vectors| E[FastEmbedEmbedder<br/><small>BAAI/bge-m3</small>]
         D -->|Sparse Vectors| F[SparseBM25Embedder<br/><small>Qdrant/bm25</small>]
         E --> G[(Qdrant Vector Store)]
         F --> G
@@ -44,7 +44,7 @@ flowchart TD
         K -->|Sub-queries + Filters| J
         L -->|Generated Abstract| J
         J -->|Dense + Sparse Prefetch| G
-        G -->|RRF Fusion Top 100| M[Cross-Encoder Reranker<br/><small>jina-reranker-v1-tiny-en</small>]
+        G -->|RRF Fusion Top 100| M[Cross-Encoder Reranker<br/><small>BAAI/bge-reranker-base</small>]
         M -->|Reranked Top 20| N[Final Results]
     end
 ```
@@ -56,7 +56,7 @@ flowchart TD
 | **Download** | `ArxivUnifiedEngine` | Streams PDFs from the public `arxiv-dataset` GCS bucket in configurable batches. Maintains a JSON cursor (`current_month`, `last_file`) for resumable, crash-safe ingestion across YYMM folders. |
 | **Parsing** | `LocalDirectoryReader` / `GCSBucketReader` | Extracts raw text from PDFs via PyMuPDF. Computes SHA-256 hashes for deduplication and extracts arXiv IDs from filenames using regex. GCS reader operates fully in-memory for serverless deployments. |
 | **Chunking** | `LayoutAwareChunker` | Uses [Docling](https://github.com/DS4SD/docling) to visually parse PDF layouts (headers, paragraphs, tables) and produce semantically grouped chunks. Falls back to `SlidingWindowChunker` for oversized blocks or when Docling is unavailable. |
-| **Embedding** | `FastEmbedEmbedder` + `SparseBM25Embedder` | Generates dense vectors (BAAI/bge-small-en-v1.5, 384-dim) and sparse BM25 vectors concurrently using ONNX Runtime. No PyTorch dependency required at inference time. |
+| **Embedding** | `FastEmbedEmbedder` + `SparseBM25Embedder` | Generates dense vectors (BAAI/bge-m3) and sparse BM25 vectors concurrently using ONNX Runtime. No PyTorch dependency required at inference time. |
 | **Storage** | `QdrantVectorStore` | Upserts chunks with deterministic UUID-v5 point IDs. Supports both server mode (Docker) and in-memory mode for testing. |
 | **Retrieval** | `HybridRetriever` | Performs server-side Reciprocal Rank Fusion (RRF) across dense and sparse prefetch lanes in Qdrant. Optionally reranks with a cross-encoder. |
 
@@ -125,10 +125,10 @@ arxiv-scholar/
 
 | Layer | Technology | Purpose |
 |:------|:-----------|:--------|
-| **Dense Embedding** | `BAAI/bge-small-en-v1.5` via FastEmbed (ONNX) | 384-dim semantic vectors, CPU-optimized |
+| **Dense Embedding** | `BAAI/bge-m3` via FastEmbed (ONNX) | Semantic vectors, CPU-optimized |
 | **Sparse Embedding** | `Qdrant/bm25` via FastEmbed | BM25 term-frequency vectors for keyword matching |
 | **Vector Database** | Qdrant | Hybrid storage with server-side RRF fusion |
-| **Reranker** | `jina-reranker-v1-tiny-en` (ONNX) | Cross-encoder precision reranking |
+| **Reranker** | `BAAI/bge-reranker-base` (ONNX) | Cross-encoder precision reranking |
 | **PDF Parsing** | PyMuPDF + Docling | Text extraction and layout-aware chunking |
 | **API** | FastAPI + Uvicorn | Streaming SSE endpoint |
 | **LLM** | OpenRouter (configurable model) | Query decomposition, HyDE generation, answer synthesis |
@@ -169,7 +169,7 @@ export OPENROUTER_API_KEY="your_key_here"
 
 # Optional overrides (defaults shown)
 export EMBEDDING_BACKEND="fastembed"            # or "sentence-transformers"
-export EMBEDDING_MODEL="BAAI/bge-small-en-v1.5"
+export EMBEDDING_MODEL="BAAI/bge-m3"
 export QDRANT_HOST="localhost"
 export QDRANT_PORT="6333"
 export QDRANT_COLLECTION="arxiv_chunks"
