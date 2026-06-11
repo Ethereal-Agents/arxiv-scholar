@@ -22,4 +22,4 @@ ENV PATH="/app/.venv/bin:$PATH"
 
 # Cloud Run injects the PORT environment variable dynamically.
 # Using sh -c allows us to evaluate ${PORT} and fallback to 8080 if not set.
-CMD ["sh", "-c", "uvicorn arxiv_scholar.api.server:app --host 0.0.0.0 --port ${PORT:-8080}"]
+CMD ["sh", "-c", "uvicorn arxiv_scholar.api.server:app --host 0.0.0.0 --port ${PORT:-8080} --proxy-headers --forwarded-allow-ips='*'"]
