@@ -6,7 +6,7 @@ class AppConfig:
     # LLM configurations
     llm_base_url: str = field(default_factory=lambda: os.getenv("LLM_BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai/"))
     llm_api_key: str = field(default_factory=lambda: os.getenv("LLM_API_KEY") or os.getenv("GEMINI_API_KEY", ""))
-    llm_model: str = field(default_factory=lambda: os.getenv("LLM_MODEL", "gemma-4-31b-it"))
+    llm_model: str = field(default_factory=lambda: os.getenv("LLM_MODEL", "gemini-2.5-flash"))
     
     # Embedding configurations
     embedding_backend: str = field(default_factory=lambda: os.getenv("EMBEDDING_BACKEND", "fastembed"))
@@ -16,7 +16,7 @@ class AppConfig:
     embedding_device: str = field(default_factory=lambda: os.getenv("EMBEDDING_DEVICE", "auto"))
 
     # Qdrant storage configuration
-    qdrant_url: str = field(default_factory=lambda: os.getenv("QDRANT_URL", ""))
+    qdrant_url: str = field(default_factory=lambda: os.getenv("QDRANT_URL", "https://7ef78171-6709-42fb-a4a9-8c4809afbdb0.eu-central-1-0.aws.cloud.qdrant.io"))
     qdrant_api_key: str = field(default_factory=lambda: os.getenv("QDRANT_API_KEY", ""))
     qdrant_host: str = field(default_factory=lambda: os.getenv("QDRANT_HOST", "localhost"))
     qdrant_port: int = field(default_factory=lambda: int(os.getenv("QDRANT_PORT", "6333")))

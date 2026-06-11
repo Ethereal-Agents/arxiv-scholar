@@ -1,9 +1,13 @@
 import time
 import logging
+import os
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
 from arxiv_scholar.llm.service import LLMService
 
 from arxiv_scholar.retrieval.orchestrator import Orchestrator
@@ -52,6 +56,15 @@ async def lifespan(app: FastAPI):
     app_state.clear()
 
 app = FastAPI(title="Arxiv Scholar RAG API", lifespan=lifespan)
+
+# CORS — allows the search UI to call the API from any origin (GitHub Pages, file://, etc.)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 @app.post("/api/v1/query")
 async def query_endpoint(request: QueryRequest):
@@ -128,3 +141,8 @@ async def query_endpoint(request: QueryRequest):
             yield f"data: {{\"type\": \"error\", \"detail\": \"{str(e)}\"}}\n\n"
             
     return StreamingResponse(_stream_response(), media_type="text/event-stream")
+
+# Static file mount MUST come after route definitions to avoid shadowing /api/* routes
+_docs_dir = Path(__file__).resolve().parents[3] / "docs"
+if _docs_dir.is_dir():
+    app.mount("/", StaticFiles(directory=str(_docs_dir), html=True), name="static")
