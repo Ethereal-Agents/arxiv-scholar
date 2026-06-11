@@ -23,6 +23,8 @@ dependencies = [
     "seaborn>=0.13.2",
     "matplotlib>=3.10.9",
     "streamlit>=1.58.0",
+    "slowapi>=0.1.9",
+    "anthropic>=0.109.1",
 ]
 
 [dependency-groups]

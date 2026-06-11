@@ -5,8 +5,8 @@ from dataclasses import dataclass, field
 class AppConfig:
     # LLM configurations
     llm_base_url: str = field(default_factory=lambda: os.getenv("LLM_BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai/"))
-    llm_api_key: str = field(default_factory=lambda: os.getenv("LLM_API_KEY") or os.getenv("GEMINI_API_KEY", ""))
-    llm_model: str = field(default_factory=lambda: os.getenv("LLM_MODEL", "gemini-2.5-flash"))
+    llm_api_key: str = field(default_factory=lambda: os.getenv("LLM_API_KEY", ""))
+    llm_model: str = field(default_factory=lambda: os.getenv("LLM_MODEL", "claude-haiku-4-5"))
     
     # Embedding configurations
     embedding_backend: str = field(default_factory=lambda: os.getenv("EMBEDDING_BACKEND", "fastembed"))

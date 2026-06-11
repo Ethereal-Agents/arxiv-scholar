@@ -4,10 +4,14 @@ import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+
 from arxiv_scholar.llm.service import LLMService
 
 from arxiv_scholar.retrieval.orchestrator import Orchestrator
@@ -57,6 +61,10 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Arxiv Scholar RAG API", lifespan=lifespan)
 
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 # CORS — allows the search UI to call the API from any origin (GitHub Pages, file://, etc.)
 app.add_middleware(
     CORSMiddleware,
@@ -67,8 +75,9 @@ app.add_middleware(
 
 
 @app.post("/api/v1/query")
-async def query_endpoint(request: QueryRequest):
-    logger.info(f"Received query request: query='{request.query}', limit={request.limit}, rerank={request.use_reranker}")
+@limiter.limit("5/minute")
+async def query_endpoint(request: Request, body: QueryRequest):
+    logger.info(f"Received query request: query='{body.query}', limit={body.limit}, rerank={body.use_reranker}")
     start_time = time.perf_counter()
     
     orchestrator = app_state.get("orchestrator")
@@ -81,11 +90,11 @@ async def query_endpoint(request: QueryRequest):
         try:
             # 1. Retrieve & Re-rank
             # Orchestrator is natively async, so we await it directly
-            logger.debug(f"Starting retrieval for query: '{request.query}'")
+            logger.debug(f"Starting retrieval for query: '{body.query}'")
             chunks = await orchestrator.retrieve(
-                request.query,
-                limit=request.limit,
-                use_reranker=request.use_reranker
+                body.query,
+                limit=body.limit,
+                use_reranker=body.use_reranker
             )
             logger.debug(f"Retrieval completed. Fetched {len(chunks)} chunks.")
             
@@ -119,8 +128,8 @@ async def query_endpoint(request: QueryRequest):
             
             # 3. LLM Synthesis Streaming
             if llm_service and llm_service.client and context_str:
-                logger.debug(f"Starting LLM stream synthesis for query: '{request.query}'")
-                stream = llm_service.stream_synthesis(request.query, context_str)
+                logger.debug(f"Starting LLM stream synthesis for query: '{body.query}'")
+                stream = llm_service.stream_synthesis(body.query, context_str)
                 
                 # YIELD 2: Token Events
                 async for token in stream:
@@ -128,7 +137,11 @@ async def query_endpoint(request: QueryRequest):
                         token_event = StreamTokenEvent(content=token)
                         yield f"data: {token_event.model_dump_json()}\n\n"
                         
-                logger.debug(f"LLM stream synthesis completed for query: '{request.query}'")
+                        
+                logger.debug(f"LLM stream synthesis completed for query: '{body.query}'")
+            else:
+                fallback_event = StreamTokenEvent(content="I could not find any matching papers in the database for your query.")
+                yield f"data: {fallback_event.model_dump_json()}\n\n"
                         
             # YIELD 3: Done Event
             latency = (time.perf_counter() - start_time) * 1000
@@ -137,7 +150,7 @@ async def query_endpoint(request: QueryRequest):
             yield f"data: {done_event.model_dump_json()}\n\n"
             
         except Exception as e:
-            logger.error(f"Error during retrieval for query '{request.query}': {e}", exc_info=True)
+            logger.error(f"Error during retrieval for query '{body.query}': {e}", exc_info=True)
             yield f"data: {{\"type\": \"error\", \"detail\": \"{str(e)}\"}}\n\n"
             
     return StreamingResponse(_stream_response(), media_type="text/event-stream")
@@ -146,3 +159,8 @@ async def query_endpoint(request: QueryRequest):
 _docs_dir = Path(__file__).resolve().parents[3] / "docs"
 if _docs_dir.is_dir():
     app.mount("/", StaticFiles(directory=str(_docs_dir), html=True), name="static")
+
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.environ.get("PORT", 8080))
+    uvicorn.run(app, host="0.0.0.0", port=port)
