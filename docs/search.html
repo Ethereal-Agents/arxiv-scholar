@@ -1,0 +1,953 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ArXiv Scholar — Search</title>
+    <meta name="description" content="Search and query academic papers from arXiv using AI-powered retrieval and synthesis.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #0f172a;
+            --accent: #3b82f6;
+            --accent-dark: #2563eb;
+            --accent-glow: rgba(59, 130, 246, 0.15);
+            --text: #e2e8f0;
+            --text-muted: #94a3b8;
+            --text-dim: #64748b;
+            --bg: #0b0f1a;
+            --bg-card: #111827;
+            --bg-input: #1e293b;
+            --border: #1e293b;
+            --border-accent: #2563eb;
+            --radius: 12px;
+            --radius-lg: 16px;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html { scroll-behavior: smooth; }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            line-height: 1.7;
+            color: var(--text);
+            background: var(--bg);
+            -webkit-font-smoothing: antialiased;
+            min-height: 100vh;
+        }
+
+        /* ── Navbar ── */
+        .navbar {
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            z-index: 100;
+            background: rgba(11, 15, 26, 0.85);
+            backdrop-filter: blur(16px);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .navbar .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 0 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 56px;
+        }
+
+        .logo {
+            font-size: 1rem;
+            font-weight: 700;
+            color: #fff;
+            text-decoration: none;
+            letter-spacing: -0.5px;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .logo-icon {
+            width: 24px; height: 24px;
+            background: var(--accent);
+            border-radius: 5px;
+            display: flex; align-items: center; justify-content: center;
+            color: white;
+            font-weight: 800;
+            font-size: 0.75rem;
+        }
+
+        .nav-right {
+            display: flex;
+            align-items: center;
+            gap: 1.25rem;
+        }
+
+        .nav-right a {
+            text-decoration: none;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+
+        .nav-right a:hover { color: #fff; }
+
+        .kbd {
+            font-size: 0.65rem;
+            font-family: inherit;
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 4px;
+            padding: 0.1rem 0.35rem;
+            color: var(--text-dim);
+            margin-left: 0.25rem;
+        }
+
+        /* ── Main Content ── */
+        .main {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 0 2rem;
+            padding-top: calc(40vh - 60px);
+            padding-bottom: 4rem;
+            transition: padding-top 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .main.has-results {
+            padding-top: 100px;
+        }
+
+        /* ── Header ── */
+        .page-header {
+            text-align: center;
+            margin-bottom: 2.5rem;
+        }
+
+        .page-header h1 {
+            font-size: 1.75rem;
+            font-weight: 800;
+            color: #fff;
+            letter-spacing: -0.03em;
+            margin-bottom: 0.5rem;
+        }
+
+        .page-header p {
+            font-size: 0.95rem;
+            color: var(--text-muted);
+        }
+
+        /* ── Search Box ── */
+        .search-container {
+            position: relative;
+            margin-bottom: 1rem;
+        }
+
+        .search-form {
+            display: flex;
+            gap: 0.5rem;
+            background: var(--bg-input);
+            border: 1.5px solid var(--border);
+            border-radius: var(--radius);
+            padding: 0.4rem;
+            transition: border-color 0.25s, box-shadow 0.25s;
+        }
+
+        .search-form:focus-within {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-glow);
+        }
+
+        .search-input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            outline: none;
+            color: #fff;
+            font-size: 0.95rem;
+            font-family: inherit;
+            padding: 0.65rem 0.75rem;
+        }
+
+        .search-input::placeholder {
+            color: var(--text-dim);
+        }
+
+        .search-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.4rem;
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            padding: 0.65rem 1.25rem;
+            font-size: 0.85rem;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.15s;
+            white-space: nowrap;
+        }
+
+        .search-btn:hover:not(:disabled) {
+            background: var(--accent-dark);
+            transform: translateY(-1px);
+        }
+
+        .search-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .search-btn svg {
+            width: 16px; height: 16px;
+        }
+
+        /* ── Example Queries ── */
+        .examples {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            justify-content: center;
+            margin-bottom: 2rem;
+        }
+
+        .example-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            background: transparent;
+            border: 1px solid var(--border);
+            border-radius: 100px;
+            padding: 0.35rem 0.85rem;
+            font-size: 0.78rem;
+            font-family: inherit;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .example-chip:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+            background: var(--accent-glow);
+        }
+
+        .example-chip .chip-icon {
+            font-size: 0.7rem;
+            opacity: 0.7;
+        }
+
+        /* ── Loading State ── */
+        .loading-bar {
+            display: none;
+            height: 2px;
+            background: var(--border);
+            border-radius: 2px;
+            overflow: hidden;
+            margin-bottom: 1.5rem;
+        }
+
+        .loading-bar.active { display: block; }
+
+        .loading-bar::after {
+            content: '';
+            display: block;
+            width: 40%;
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent), #818cf8);
+            border-radius: 2px;
+            animation: loading-slide 1.2s ease-in-out infinite;
+        }
+
+        @keyframes loading-slide {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(350%); }
+        }
+
+        .status-text {
+            display: none;
+            text-align: center;
+            font-size: 0.8rem;
+            color: var(--text-dim);
+            margin-bottom: 1rem;
+            animation: fade-in 0.3s ease;
+        }
+
+        .status-text.active { display: block; }
+
+        /* ── Answer Section ── */
+        .answer-section {
+            display: none;
+            animation: fade-in 0.4s ease;
+        }
+
+        .answer-section.active { display: block; }
+
+        .answer-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+        }
+
+        .answer-label {
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--accent);
+        }
+
+        .copy-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            background: transparent;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 0.3rem 0.6rem;
+            font-size: 0.72rem;
+            font-family: inherit;
+            font-weight: 500;
+            color: var(--text-dim);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .copy-btn:hover {
+            border-color: var(--text-muted);
+            color: var(--text-muted);
+        }
+
+        .copy-btn.copied {
+            border-color: #22c55e;
+            color: #22c55e;
+        }
+
+        .copy-btn svg { width: 13px; height: 13px; }
+
+        .answer-body {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 1.5rem;
+            font-size: 0.92rem;
+            line-height: 1.8;
+            color: var(--text);
+            min-height: 60px;
+        }
+
+        .answer-body .cursor {
+            display: inline-block;
+            width: 2px;
+            height: 1.1em;
+            background: var(--accent);
+            vertical-align: text-bottom;
+            animation: blink 0.8s step-end infinite;
+            margin-left: 2px;
+        }
+
+        @keyframes blink {
+            50% { opacity: 0; }
+        }
+
+        /* ── Markdown in answer ── */
+        .answer-body p { margin-bottom: 0.75rem; }
+        .answer-body p:last-child { margin-bottom: 0; }
+        .answer-body strong { color: #fff; font-weight: 600; }
+        .answer-body em { color: var(--text-muted); font-style: italic; }
+
+        .answer-body h1, .answer-body h2, .answer-body h3 {
+            color: #fff;
+            font-weight: 700;
+            margin: 1.25rem 0 0.5rem;
+        }
+        .answer-body h1 { font-size: 1.15rem; }
+        .answer-body h2 { font-size: 1.05rem; }
+        .answer-body h3 { font-size: 0.95rem; }
+
+        .answer-body ul, .answer-body ol {
+            margin: 0.5rem 0 0.75rem 1.25rem;
+        }
+        .answer-body li {
+            margin-bottom: 0.3rem;
+        }
+
+        .answer-body a.citation {
+            color: var(--accent);
+            text-decoration: none;
+            font-size: 0.82rem;
+            font-weight: 500;
+            background: var(--accent-glow);
+            padding: 0.05rem 0.4rem;
+            border-radius: 4px;
+            transition: all 0.15s;
+            white-space: nowrap;
+        }
+
+        .answer-body a.citation:hover {
+            background: rgba(59, 130, 246, 0.25);
+            text-decoration: underline;
+        }
+
+        .answer-body code {
+            background: rgba(255,255,255,0.06);
+            padding: 0.15rem 0.4rem;
+            border-radius: 4px;
+            font-size: 0.85em;
+        }
+
+        /* ── Sources Section ── */
+        .sources-section {
+            display: none;
+            margin-top: 1.5rem;
+            animation: fade-in 0.4s ease;
+        }
+
+        .sources-section.active { display: block; }
+
+        .sources-label {
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-dim);
+            margin-bottom: 0.75rem;
+        }
+
+        .source-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            margin-bottom: 0.5rem;
+            transition: border-color 0.2s;
+            overflow: hidden;
+        }
+
+        .source-card:hover {
+            border-color: var(--text-dim);
+        }
+
+        .source-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.85rem 1rem;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .source-meta {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            min-width: 0;
+        }
+
+        .source-index {
+            font-size: 0.7rem;
+            font-weight: 700;
+            color: var(--accent);
+            background: var(--accent-glow);
+            padding: 0.15rem 0.5rem;
+            border-radius: 4px;
+            flex-shrink: 0;
+        }
+
+        .source-title {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .source-title a {
+            color: inherit;
+            text-decoration: none;
+        }
+
+        .source-title a:hover { text-decoration: underline; }
+
+        .source-score {
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            flex-shrink: 0;
+        }
+
+        .source-chevron {
+            width: 16px; height: 16px;
+            color: var(--text-dim);
+            transition: transform 0.2s;
+            flex-shrink: 0;
+        }
+
+        .source-card.expanded .source-chevron {
+            transform: rotate(180deg);
+        }
+
+        .source-content {
+            display: none;
+            padding: 0 1rem 1rem;
+            font-size: 0.82rem;
+            color: var(--text-muted);
+            line-height: 1.7;
+            border-top: 1px solid var(--border);
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .source-card.expanded .source-content {
+            display: block;
+            padding-top: 0.85rem;
+        }
+
+        /* ── Footer Bar ── */
+        .footer-bar {
+            display: none;
+            margin-top: 1.5rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border);
+            animation: fade-in 0.3s ease;
+        }
+
+        .footer-bar.active {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .latency {
+            font-size: 0.8rem;
+            color: var(--text-dim);
+        }
+
+        .new-search-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            background: transparent;
+            color: var(--accent);
+            border: 1.5px solid var(--border);
+            border-radius: 8px;
+            padding: 0.5rem 1rem;
+            font-size: 0.82rem;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .new-search-btn:hover {
+            border-color: var(--accent);
+            background: var(--accent-glow);
+        }
+
+        /* ── Error ── */
+        .error-box {
+            display: none;
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            border-radius: var(--radius);
+            padding: 1rem 1.25rem;
+            font-size: 0.85rem;
+            color: #fca5a5;
+            margin-bottom: 1rem;
+            animation: fade-in 0.3s ease;
+        }
+
+        .error-box.active { display: block; }
+
+        /* ── Utility ── */
+        @keyframes fade-in {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ── Responsive ── */
+        @media (max-width: 600px) {
+            .main { padding-top: 100px; }
+            .page-header h1 { font-size: 1.35rem; }
+            .search-form { flex-direction: column; }
+            .search-btn { justify-content: center; }
+            .examples { justify-content: flex-start; }
+            .footer-bar.active { flex-direction: column; gap: 0.75rem; align-items: flex-start; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Navbar -->
+    <nav class="navbar">
+        <div class="container">
+            <a href="index.html" class="logo">
+                <div class="logo-icon">A</div>
+                ArXiv Scholar
+            </a>
+            <div class="nav-right">
+                <a href="index.html">Home</a>
+                <a href="https://github.com/dubeyaayush07/arxiv-scholar" target="_blank">GitHub</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main -->
+    <main class="main">
+        <div class="page-header">
+            <h1>Search Academic Papers</h1>
+            <p>Ask a question about recent AI and engineering research — answers grounded in real arXiv papers.</p>
+        </div>
+
+        <!-- Search -->
+        <div class="search-container">
+            <form class="search-form" id="search-form">
+                <input
+                    type="text"
+                    class="search-input"
+                    id="search-input"
+                    placeholder="e.g. What is the impact of dropout on transformer architectures?"
+                    autocomplete="off"
+                    autofocus
+                >
+                <button type="submit" class="search-btn" id="search-btn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                    Search
+                </button>
+            </form>
+        </div>
+
+        <!-- Example Queries -->
+        <div class="examples" id="examples">
+            <button class="example-chip" data-query="What is contrastive learning?">
+                <span class="chip-icon">→</span> What is contrastive learning?
+            </button>
+            <button class="example-chip" data-query="Compare LoRA vs full fine-tuning for LLMs">
+                <span class="chip-icon">→</span> Compare LoRA vs full fine-tuning
+            </button>
+            <button class="example-chip" data-query="How does retrieval augmented generation reduce hallucinations?">
+                <span class="chip-icon">→</span> RAG and hallucination reduction
+            </button>
+        </div>
+
+        <!-- Loading -->
+        <div class="loading-bar" id="loading-bar"></div>
+        <div class="status-text" id="status-text">Retrieving and re-ranking papers…</div>
+
+        <!-- Error -->
+        <div class="error-box" id="error-box"></div>
+
+        <!-- Answer -->
+        <div class="answer-section" id="answer-section">
+            <div class="answer-header">
+                <div class="answer-label">Answer</div>
+                <button class="copy-btn" id="copy-btn" title="Copy answer to clipboard">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                    <span id="copy-label">Copy</span>
+                </button>
+            </div>
+            <div class="answer-body" id="answer-body"></div>
+        </div>
+
+        <!-- Sources -->
+        <div class="sources-section" id="sources-section">
+            <div class="sources-label">Sources</div>
+            <div id="sources-list"></div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer-bar" id="footer-bar">
+            <span class="latency" id="latency"></span>
+            <button class="new-search-btn" id="new-search-btn">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+                New Search
+            </button>
+        </div>
+    </main>
+
+    <script>
+        // ── Config ──
+        const API_BASE = new URLSearchParams(window.location.search).get('api') || 'http://localhost:8000';
+
+        // ── DOM Refs ──
+        const form          = document.getElementById('search-form');
+        const input         = document.getElementById('search-input');
+        const searchBtn     = document.getElementById('search-btn');
+        const loadingBar    = document.getElementById('loading-bar');
+        const statusText    = document.getElementById('status-text');
+        const errorBox      = document.getElementById('error-box');
+        const answerSection = document.getElementById('answer-section');
+        const answerBody    = document.getElementById('answer-body');
+        const sourcesSection= document.getElementById('sources-section');
+        const sourcesList   = document.getElementById('sources-list');
+        const footerBar     = document.getElementById('footer-bar');
+        const latencyEl     = document.getElementById('latency');
+        const newSearchBtn  = document.getElementById('new-search-btn');
+        const copyBtn       = document.getElementById('copy-btn');
+        const copyLabel     = document.getElementById('copy-label');
+        const examplesDiv   = document.getElementById('examples');
+
+        // ── State ──
+        let abortController = null;
+        let rawAnswer = '';
+
+        // ── Helpers ──
+        function show(el)  { el.classList.add('active'); }
+        function hide(el)  { el.classList.remove('active'); }
+        function resetUI() {
+            hide(loadingBar); hide(statusText); hide(errorBox);
+            hide(answerSection); hide(sourcesSection); hide(footerBar);
+            answerBody.innerHTML = '';
+            sourcesList.innerHTML = '';
+            errorBox.textContent = '';
+            latencyEl.textContent = '';
+            rawAnswer = '';
+            copyBtn.classList.remove('copied');
+            copyLabel.textContent = 'Copy';
+            examplesDiv.style.display = '';
+        }
+
+        // ── Markdown Renderer ──
+        function renderMarkdown(text) {
+            let html = escapeHtml(text);
+
+            // Convert arXiv citation URLs: [https://arxiv.org/abs/ID] → clickable chip
+            html = html.replace(/\[?(https?:\/\/arxiv\.org\/abs\/([^\]\s,]+))\]?/g, (_, url, id) => {
+                return `<a class="citation" href="${url}" target="_blank" rel="noopener">arXiv:${id}</a>`;
+            });
+
+            // Bold: **text**
+            html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+
+            // Italic: *text*
+            html = html.replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, '<em>$1</em>');
+
+            // Inline code: `text`
+            html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+            // Headers: ### text
+            html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+            html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+            html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+
+            // Unordered lists: - item or * item
+            html = html.replace(/^[-*] (.+)$/gm, '<li>$1</li>');
+            html = html.replace(/((?:<li>.*<\/li>\n?)+)/g, '<ul>$1</ul>');
+
+            // Ordered lists: 1. item
+            html = html.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
+
+            // Paragraphs: double newlines
+            html = html.replace(/\n\n+/g, '</p><p>');
+
+            // Single newlines within paragraphs
+            html = html.replace(/\n/g, '<br>');
+
+            // Wrap in paragraph tags
+            html = '<p>' + html + '</p>';
+
+            // Clean up empty paragraphs and paragraphs around block elements
+            html = html.replace(/<p>\s*<\/p>/g, '');
+            html = html.replace(/<p>(<h[123]>)/g, '$1');
+            html = html.replace(/(<\/h[123]>)<\/p>/g, '$1');
+            html = html.replace(/<p>(<ul>)/g, '$1');
+            html = html.replace(/(<\/ul>)<\/p>/g, '$1');
+
+            return html;
+        }
+
+        // ── Search Handler ──
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const query = input.value.trim();
+            if (!query) return;
+
+            // Cancel any in-flight request
+            if (abortController) abortController.abort();
+            abortController = new AbortController();
+
+            resetUI();
+            document.querySelector('.main').classList.add('has-results');
+            examplesDiv.style.display = 'none';
+            searchBtn.disabled = true;
+            show(loadingBar);
+            show(statusText);
+            statusText.textContent = 'Retrieving and re-ranking papers…';
+
+            try {
+                const res = await fetch(`${API_BASE}/api/v1/query`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query, limit: 5, use_reranker: false }),
+                    signal: abortController.signal,
+                });
+
+                if (!res.ok) {
+                    throw new Error(`Server returned ${res.status}: ${res.statusText}`);
+                }
+
+                const reader = res.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop(); // keep incomplete line in buffer
+
+                    for (const line of lines) {
+                        if (!line.startsWith('data: ')) continue;
+                        const jsonStr = line.slice(6).trim();
+                        if (!jsonStr) continue;
+
+                        let event;
+                        try { event = JSON.parse(jsonStr); }
+                        catch { continue; }
+
+                        switch (event.type) {
+                            case 'metadata':
+                                hide(loadingBar);
+                                statusText.textContent = 'Synthesizing answer…';
+                                renderSources(event.sources || []);
+                                show(answerSection);
+                                answerBody.innerHTML = '<span style="color:var(--text-dim)">Generating…</span>';
+                                break;
+
+                            case 'token':
+                                rawAnswer += event.content;
+                                answerBody.innerHTML = renderMarkdown(rawAnswer) + '<span class="cursor"></span>';
+                                answerBody.scrollTop = answerBody.scrollHeight;
+                                break;
+
+                            case 'done':
+                                hide(statusText);
+                                answerBody.innerHTML = renderMarkdown(rawAnswer);
+                                latencyEl.textContent = `Completed in ${(event.latency_ms / 1000).toFixed(2)}s`;
+                                show(footerBar);
+                                break;
+
+                            case 'error':
+                                throw new Error(event.detail || 'Unknown server error');
+                        }
+                    }
+                }
+
+            } catch (err) {
+                if (err.name === 'AbortError') return;
+                hide(loadingBar); hide(statusText);
+                errorBox.textContent = `⚠ ${err.message}`;
+                show(errorBox);
+            } finally {
+                searchBtn.disabled = false;
+            }
+        });
+
+        // ── Render Sources ──
+        function renderSources(sources) {
+            sourcesList.innerHTML = '';
+            if (!sources.length) return;
+
+            sources.forEach((src, i) => {
+                const arxivId = (src.metadata && src.metadata.arxiv_id) || '';
+                const title   = (src.metadata && src.metadata.title) || arxivId || `Source ${i + 1}`;
+                const url     = arxivId ? `https://arxiv.org/abs/${arxivId}` : '#';
+                const score   = (src.score != null) ? src.score.toFixed(4) : '';
+
+                const card = document.createElement('div');
+                card.className = 'source-card';
+                card.innerHTML = `
+                    <div class="source-header" onclick="this.parentElement.classList.toggle('expanded')">
+                        <div class="source-meta">
+                            <span class="source-index">${i + 1}</span>
+                            <span class="source-title"><a href="${url}" target="_blank" onclick="event.stopPropagation()">${escapeHtml(title)}</a></span>
+                        </div>
+                        <div style="display:flex;align-items:center;gap:0.75rem;">
+                            ${score ? `<span class="source-score">${score}</span>` : ''}
+                            <svg class="source-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                        </div>
+                    </div>
+                    <div class="source-content">${escapeHtml(src.text || '')}</div>
+                `;
+                sourcesList.appendChild(card);
+            });
+
+            show(sourcesSection);
+        }
+
+        // ── Copy Answer ──
+        copyBtn.addEventListener('click', async () => {
+            if (!rawAnswer) return;
+            try {
+                await navigator.clipboard.writeText(rawAnswer);
+                copyBtn.classList.add('copied');
+                copyLabel.textContent = 'Copied!';
+                setTimeout(() => {
+                    copyBtn.classList.remove('copied');
+                    copyLabel.textContent = 'Copy';
+                }, 2000);
+            } catch {
+                // Fallback for older browsers
+                const ta = document.createElement('textarea');
+                ta.value = rawAnswer;
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+                copyBtn.classList.add('copied');
+                copyLabel.textContent = 'Copied!';
+                setTimeout(() => {
+                    copyBtn.classList.remove('copied');
+                    copyLabel.textContent = 'Copy';
+                }, 2000);
+            }
+        });
+
+        // ── Example Queries ──
+        examplesDiv.addEventListener('click', (e) => {
+            const chip = e.target.closest('.example-chip');
+            if (!chip) return;
+            const query = chip.dataset.query;
+            if (!query) return;
+            input.value = query;
+            form.dispatchEvent(new Event('submit'));
+        });
+
+        // ── New Search ──
+        newSearchBtn.addEventListener('click', () => {
+            if (abortController) abortController.abort();
+            resetUI();
+            document.querySelector('.main').classList.remove('has-results');
+            input.value = '';
+            input.focus();
+        });
+
+        // ── Keyboard Shortcut: Cmd+K / Ctrl+K ──
+        document.addEventListener('keydown', (e) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+                e.preventDefault();
+                input.focus();
+                input.select();
+            }
+        });
+
+        // ── Escape HTML ──
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+    </script>
+
+</body>
+</html>
