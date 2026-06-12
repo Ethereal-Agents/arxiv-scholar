@@ -18,7 +18,8 @@ e2e_trial_state.json
 
 # Data and Analysis
 nlp_ml_gcs_pdfs/
-data/
+data/*
+!data/router_dataset/
 analysis/
 snapshots/
 

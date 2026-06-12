@@ -1,3 +1,12 @@
+---
+title: Arxiv Scholar
+emoji: 📚
+colorFrom: blue
+colorTo: purple
+sdk: docker
+pinned: false
+---
+
 # ArXiv Scholar
 
 **A high-performance Retrieval-Augmented Generation (RAG) system over the arXiv corpus.**
