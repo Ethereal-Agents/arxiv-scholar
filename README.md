@@ -143,7 +143,7 @@ arxiv-scholar/
 
 | Layer | Technology | Purpose |
 |:------|:-----------|:--------|
-| **Dense Embedding** | `BAAI/bge-m3` via FastEmbed (ONNX) | Semantic vectors, CPU-optimized |
+| **Dense Embedding** | `BAAI/bge-m3` via SentenceTransformers (PyTorch) | Semantic vectors |
 | **Sparse Embedding** | `Qdrant/bm25` via FastEmbed | BM25 term-frequency vectors for keyword matching |
 | **Vector Database** | Qdrant Cloud | Hybrid storage with server-side query batching |
 | **PDF Parsing** | PyMuPDF + Docling | Text extraction and layout-aware chunking |
@@ -239,7 +239,7 @@ curl -N -X POST "https://trinetra-dev-arxiv-scholar.hf.space/api/v1/query" \
 
 ```bash
 # Start the server
-uvicorn arxiv_scholar.api.server:app --reload
+uvicorn src.arxiv_scholar.api.server:app --reload
 
 # Or via Docker
 docker build -t arxiv-scholar .
