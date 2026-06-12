@@ -319,7 +319,7 @@
 
         .arch-pipeline {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
+            grid-template-columns: repeat(3, 1fr);
             gap: 0;
             position: relative;
             margin-top: 1rem;
@@ -622,7 +622,7 @@
         <div class="container">
             <div class="hero-badge">
                 <span class="dot"></span>
-                Ingestion pipeline in progress
+                Live — 5.6K AI Engineering Papers Indexed
             </div>
             <h1>Precise retrieval for the world's scientific knowledge.</h1>
             <p>An open-source RAG infrastructure that indexes arXiv at scale, enabling researchers and AI agents to retrieve high-signal academic literature without hallucinations.</p>
@@ -644,12 +644,12 @@
         <div class="container">
             <div class="stats-grid">
                 <div class="stat-item">
-                    <div class="stat-number">250K+</div>
-                    <div class="stat-label">Target Documents (CS)</div>
+                    <div class="stat-number">~5.6K</div>
+                    <div class="stat-label">Indexed Papers</div>
                 </div>
                 <div class="stat-item">
-                    <div class="stat-number">915K+</div>
-                    <div class="stat-label">Target Documents (Full arXiv)</div>
+                    <div class="stat-number">AI Eng.</div>
+                    <div class="stat-label">Domain Focus</div>
                 </div>
                 <div class="stat-item">
                     <div class="stat-number">&lt;250ms</div>
@@ -675,7 +675,7 @@
                 <div class="motivation-card">
                     <div class="motivation-icon">🎯</div>
                     <h3>High-Signal Filtering</h3>
-                    <p>We exclude papers with 5 or fewer citations, removing ~70% of uncited preprints. What remains is a peer-validated, dense knowledge base optimized for retrieval quality.</p>
+                    <p>Papers are curated using a multi-dimensional keyword and domain filtering system. Only papers matching rigorous AI engineering criteria — across RAG, LLMs, agents, training, and inference — are included.</p>
                 </div>
                 <div class="motivation-card">
                     <div class="motivation-icon">🔄</div>
@@ -720,11 +720,7 @@
                     <h4>Hybrid Search</h4>
                     <p>Dense embeddings (BGE) and sparse retrieval (BM25) are fused using Reciprocal Rank Fusion on Qdrant.</p>
                 </div>
-                <div class="arch-step">
-                    <div class="arch-step-num">4</div>
-                    <h4>Filtered Results</h4>
-                    <p>Metadata constraints are applied natively at the database level via Qdrant Prefetch filters.</p>
-                </div>
+
             </div>
         </div>
     </section>
@@ -762,13 +758,13 @@
                 </div>
                 <div class="timeline-item">
                     <div class="timeline-marker">
-                        <div class="timeline-dot"></div>
+                        <div class="timeline-dot completed"></div>
                         <div class="timeline-line"></div>
                     </div>
                     <div class="timeline-content">
-                        <h4>Initial Ingestion Run <span class="timeline-tag tag-active">In Progress</span></h4>
+                        <h4>Initial Ingestion Run <span class="timeline-tag tag-done">Complete</span></h4>
                         <div class="timeline-date">June 2026</div>
-                        <p>Large-scale ingestion of 250,000+ citation-filtered CS papers from arXiv using GPU-accelerated batch embedding with the chunk pooling architecture.</p>
+                        <p>Ingested ~5,600 AI Engineering papers from arXiv via Google Colab notebooks, with embeddings pushed to Qdrant Cloud.</p>
                     </div>
                 </div>
                 <div class="timeline-item">
@@ -789,7 +785,7 @@
                     <div class="timeline-content">
                         <h4>Full arXiv Coverage <span class="timeline-tag tag-soon">Planned</span></h4>
                         <div class="timeline-date">Q4 2026</div>
-                        <p>Expand ingestion to 915,000+ high-impact papers across all arXiv domains — Physics, Mathematics, Biology, Statistics, and more.</p>
+                        <p>Scale the paper corpus using an agent-driven ingestion pipeline paired with an evaluation framework to continuously expand coverage across AI Engineering topics.</p>
                     </div>
                 </div>
             </div>

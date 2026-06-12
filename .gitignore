@@ -5,6 +5,7 @@ arxiv_batch/
 __pycache__/
 .DS_Store
 .idea/
+.qdrant-initialized
 .antigravitycli/
 .pytest_cache/
 *.egg-info/
