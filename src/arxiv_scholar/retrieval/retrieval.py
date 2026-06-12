@@ -37,11 +37,11 @@ class HybridRetriever:
         
         # 1. Initialize the Qdrant client
         if location:
-            self.client = QdrantClient(location=location)
+            self.client = QdrantClient(location=location, timeout=30.0)
         elif qdrant_url and qdrant_api_key:
-            self.client = QdrantClient(url=qdrant_url, api_key=qdrant_api_key)
+            self.client = QdrantClient(url=qdrant_url, api_key=qdrant_api_key, timeout=30.0)
         else:
-            self.client = QdrantClient(host=qdrant_host, port=qdrant_port)
+            self.client = QdrantClient(host=qdrant_host, port=qdrant_port, timeout=30.0)
             
         logger.info(f"Initialized QdrantClient for collection '{collection_name}'")
 

@@ -5,6 +5,7 @@ arxiv_batch/
 __pycache__/
 .DS_Store
 .idea/
+.qdrant-initialized
 .antigravitycli/
 .pytest_cache/
 *.egg-info/
@@ -18,7 +19,8 @@ e2e_trial_state.json
 
 # Data and Analysis
 nlp_ml_gcs_pdfs/
-data/
+data/*
+!data/router_dataset/
 analysis/
 snapshots/
 
