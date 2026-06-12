@@ -539,6 +539,161 @@
             height: 16px;
         }
 
+        /* ── API Section ── */
+        .api-section {
+            background: var(--bg-dark);
+            padding: 6rem 0;
+        }
+
+        .api-section .section-label { color: #60a5fa; }
+
+        .api-section .section-title,
+        .api-section .section-desc { color: #e2e8f0; }
+
+        .api-section .section-desc { color: #94a3b8; }
+
+        .api-layout {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 3rem;
+            align-items: start;
+        }
+
+        .api-info {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .api-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.35rem 0.9rem;
+            background: rgba(34, 197, 94, 0.12);
+            border: 1px solid rgba(34, 197, 94, 0.3);
+            border-radius: 100px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: #4ade80;
+            width: fit-content;
+        }
+
+        .api-badge .dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #22c55e;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        .api-endpoint {
+            font-family: 'Courier New', monospace;
+            font-size: 0.82rem;
+            color: #60a5fa;
+            background: rgba(59, 130, 246, 0.08);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            border-radius: 8px;
+            padding: 0.6rem 1rem;
+            word-break: break-all;
+        }
+
+        .api-pills {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .api-pill {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            color: #cbd5e1;
+            font-size: 0.9rem;
+        }
+
+        .api-pill-icon {
+            font-size: 1rem;
+            margin-top: 0.1rem;
+            flex-shrink: 0;
+        }
+
+        .api-pill strong { color: #f1f5f9; }
+
+        .terminal {
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: var(--radius);
+            overflow: hidden;
+            box-shadow: 0 24px 48px rgba(0,0,0,0.4);
+        }
+
+        .terminal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.75rem 1.25rem;
+            background: #161b22;
+            border-bottom: 1px solid #30363d;
+        }
+
+        .terminal-dots {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .terminal-dots span {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        .dot-red { background: #ff5f57; }
+        .dot-yellow { background: #febc2e; }
+        .dot-green { background: #28c840; }
+
+        .terminal-label {
+            font-size: 0.75rem;
+            color: #8b949e;
+            font-family: 'Courier New', monospace;
+        }
+
+        .copy-btn {
+            background: transparent;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            color: #8b949e;
+            font-size: 0.72rem;
+            padding: 0.25rem 0.6rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+
+        .copy-btn:hover { border-color: #60a5fa; color: #60a5fa; }
+        .copy-btn.copied { border-color: #4ade80; color: #4ade80; }
+
+        .terminal-body {
+            padding: 1.5rem;
+            font-family: 'Courier New', monospace;
+            font-size: 0.82rem;
+            line-height: 1.8;
+            overflow-x: auto;
+        }
+
+        .token-cmd { color: #79c0ff; }
+        .token-flag { color: #d2a8ff; }
+        .token-url { color: #ffa657; }
+        .token-str { color: #a5f3a5; }
+        .token-key { color: #79c0ff; }
+        .token-num { color: #f8c555; }
+        .token-bool { color: #ff7b72; }
+        .token-comment { color: #8b949e; font-style: italic; }
+
+        @media (max-width: 768px) {
+            .api-layout { grid-template-columns: 1fr; }
+        }
+
         /* ── Footer ── */
         .footer {
             background: var(--bg-dark);
@@ -608,6 +763,7 @@
             <div class="nav-links">
                 <a href="#motivation">Motivation</a>
                 <a href="#architecture">Architecture</a>
+                <a href="#api">API</a>
                 <a href="#roadmap">Roadmap</a>
                 <a href="#team">Team</a>
                 <a href="search.html" class="btn btn-outline" style="margin-right:-0.5rem">Try Search</a>
@@ -719,6 +875,64 @@
                     <p>Dense embeddings (BGE) and sparse retrieval (BM25) are fused using Reciprocal Rank Fusion on Qdrant.</p>
                 </div>
 
+            </div>
+        </div>
+    </section>
+
+    <!-- Try the API -->
+    <section id="api" class="api-section">
+        <div class="container">
+            <div class="section-header">
+                <div class="section-label">Developer Access</div>
+                <h2 class="section-title">Try the API</h2>
+                <p class="section-desc">Live endpoint on Hugging Face Spaces. No authentication required. Responses stream via Server-Sent Events.</p>
+            </div>
+            <div class="api-layout">
+                <div class="api-info">
+                    <div class="api-badge">
+                        <span class="dot"></span>
+                        Live &amp; Public
+                    </div>
+                    <div class="api-endpoint">POST https://trinetra-dev-arxiv-scholar.hf.space/api/v1/query</div>
+                    <div class="api-pills">
+                        <div class="api-pill">
+                            <span class="api-pill-icon">⚡</span>
+                            <span><strong>Streaming SSE</strong> — tokens stream back as they are generated, sources arrive first</span>
+                        </div>
+                        <div class="api-pill">
+                            <span class="api-pill-icon">🔀</span>
+                            <span><strong>Intelligent routing</strong> — queries are automatically classified as Direct, Decompose, or HyDE</span>
+                        </div>
+                        <div class="api-pill">
+                            <span class="api-pill-icon">📄</span>
+                            <span><strong>Grounded answers</strong> — every response is sourced from real arXiv papers with IDs attached</span>
+                        </div>
+                        <div class="api-pill">
+                            <span class="api-pill-icon">🛡️</span>
+                            <span><strong>Rate limited</strong> — 5 requests/minute per IP to keep the service fair for everyone</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="terminal" id="api-terminal">
+                    <div class="terminal-header">
+                        <div class="terminal-dots">
+                            <span class="dot-red"></span>
+                            <span class="dot-yellow"></span>
+                            <span class="dot-green"></span>
+                        </div>
+                        <span class="terminal-label">curl</span>
+                        <button class="copy-btn" id="copy-curl-btn" onclick="copyCurl()">Copy</button>
+                    </div>
+                    <div class="terminal-body">
+<span class="token-cmd">curl</span> <span class="token-flag">-N -X POST</span> <span class="token-url">"https://trinetra-dev-arxiv-scholar.hf.space/api/v1/query"</span> <span class="token-flag">\</span>
+  <span class="token-flag">-H</span> <span class="token-str">"Content-Type: application/json"</span> <span class="token-flag">\</span>
+  <span class="token-flag">-d</span> <span class="token-str">'&#123;</span>
+    <span class="token-key">"query"</span>: <span class="token-str">"What is contrastive learning?"</span>,
+    <span class="token-key">"limit"</span>: <span class="token-num">5</span>,
+    <span class="token-key">"use_reranker"</span>: <span class="token-bool">false</span>
+  <span class="token-str">}'</span>
+                    </div>
+                </div>
             </div>
         </div>
     </section>
@@ -837,6 +1051,27 @@
             </div>
         </div>
     </footer>
+
+<script>
+function copyCurl() {
+    const cmd = `curl -N -X POST "https://trinetra-dev-arxiv-scholar.hf.space/api/v1/query" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "query": "What is contrastive learning?",
+    "limit": 5,
+    "use_reranker": false
+  }'`;
+    navigator.clipboard.writeText(cmd).then(() => {
+        const btn = document.getElementById('copy-curl-btn');
+        btn.textContent = 'Copied!';
+        btn.classList.add('copied');
+        setTimeout(() => {
+            btn.textContent = 'Copy';
+            btn.classList.remove('copied');
+        }, 2000);
+    });
+}
+</script>
 
 </body>
 </html>
