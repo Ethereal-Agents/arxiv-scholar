@@ -275,7 +275,7 @@
         /* ── Motivation ── */
         .motivation-grid {
             display: grid;
-            grid-template-columns: repeat(2, 1fr);
+            grid-template-columns: repeat(3, 1fr);
             gap: 1.5rem;
         }
 
@@ -589,8 +589,15 @@
             .arch-step:not(:last-child)::after { content: '↓'; right: auto; bottom: -8px; top: auto; transform: none; left: 50%; }
             .team-grid { flex-direction: column; align-items: center; }
             .nav-links a:not(.btn) { display: none; }
+            .nav-links { gap: 0.75rem; }
+            .nav-links .btn { padding: 0.45rem 0.9rem; font-size: 0.8rem; }
             .footer-inner { flex-direction: column; gap: 1.5rem; text-align: center; }
             .footer-links a { margin: 0 0.75rem; }
+        }
+
+        @media (max-width: 480px) {
+            .nav-links .btn-outline { display: none; }
+            .nav-links { gap: 0.5rem; }
         }
     </style>
 </head>
@@ -669,7 +676,7 @@
             <div class="section-header">
                 <div class="section-label">Why This Exists</div>
                 <h2 class="section-title">Bridging the Knowledge Gap</h2>
-                <p class="section-desc">LLMs hallucinate when asked about cutting-edge research. We solve this with a rigorously engineered, citation-filtered retrieval pipeline.</p>
+                <p class="section-desc">LLMs hallucinate when asked about cutting-edge research. We solve this with a rigorously engineered retrieval pipeline over curated AI Engineering literature.</p>
             </div>
             <div class="motivation-grid">
                 <div class="motivation-card">
@@ -677,11 +684,7 @@
                     <h3>High-Signal Filtering</h3>
                     <p>Papers are curated using a multi-dimensional keyword and domain filtering system. Only papers matching rigorous AI engineering criteria — across RAG, LLMs, agents, training, and inference — are included.</p>
                 </div>
-                <div class="motivation-card">
-                    <div class="motivation-icon">🔄</div>
-                    <h3>Live Synchronization</h3>
-                    <p>arXiv publishes ~1,000 new papers daily. Our automated pipeline continuously ingests, parses, embeds, and indexes new publications as they appear.</p>
-                </div>
+
                 <div class="motivation-card">
                     <div class="motivation-icon">🤖</div>
                     <h3>Agentic Research</h3>
@@ -769,13 +772,13 @@
                 </div>
                 <div class="timeline-item">
                     <div class="timeline-marker">
-                        <div class="timeline-dot upcoming"></div>
+                        <div class="timeline-dot completed"></div>
                         <div class="timeline-line"></div>
                     </div>
                     <div class="timeline-content">
-                        <h4>Public API Release <span class="timeline-tag tag-soon">Coming Soon</span></h4>
-                        <div class="timeline-date">Q3 2026</div>
-                        <p>FastAPI-based streaming endpoint exposing the full retrieval pipeline. Enables developers and AI agents worldwide to query peer-validated scientific literature on-demand.</p>
+                        <h4>Public API Release <span class="timeline-tag tag-done">Complete</span></h4>
+                        <div class="timeline-date">June 2026</div>
+                        <p>FastAPI-based streaming endpoint live on Hugging Face Spaces. Developers and AI agents can query the full retrieval pipeline on-demand via SSE.</p>
                     </div>
                 </div>
                 <div class="timeline-item">

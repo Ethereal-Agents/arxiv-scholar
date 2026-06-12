@@ -223,6 +223,20 @@ python main.py
 
 The API server is implemented in [`src/arxiv_scholar/api/server.py`](src/arxiv_scholar/api/server.py). It exposes a streaming SSE endpoint that routes queries, retrieves results, and synthesizes answers via LLM.
 
+**Live hosted endpoint** (Hugging Face Spaces):
+
+```bash
+curl -N -X POST "https://trinetra-dev-arxiv-scholar.hf.space/api/v1/query" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "What is contrastive learning?",
+    "limit": 5,
+    "use_reranker": false
+  }'
+```
+
+**Run locally:**
+
 ```bash
 # Start the server
 uvicorn arxiv_scholar.api.server:app --reload
@@ -232,12 +246,11 @@ docker build -t arxiv-scholar .
 docker run -p 7860:7860 --env-file .env arxiv-scholar
 ```
 
-Query the streaming endpoint:
-
 ```bash
-curl -X POST http://localhost:8000/api/v1/query \
+# Query your local instance
+curl -N -X POST http://localhost:8000/api/v1/query \
   -H "Content-Type: application/json" \
-  -d '{"query": "attention mechanisms in transformers", "limit": 10}'
+  -d '{"query": "attention mechanisms in transformers", "limit": 10, "use_reranker": false}'
 ```
 
 ### Running Tests
