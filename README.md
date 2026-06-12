@@ -66,7 +66,7 @@ flowchart TD
 | **Download** | `ArxivUnifiedEngine` | Streams PDFs from the public `arxiv-dataset` GCS bucket in configurable batches. Maintains a JSON cursor (`current_month`, `last_file`) for resumable, crash-safe ingestion across YYMM folders. |
 | **Parsing** | `LocalDirectoryReader` / `GCSBucketReader` | Extracts raw text from PDFs via PyMuPDF. Computes SHA-256 hashes for deduplication and extracts arXiv IDs from filenames using regex. GCS reader operates fully in-memory for serverless deployments. |
 | **Chunking** | `LayoutAwareChunker` | Uses [Docling](https://github.com/DS4SD/docling) to visually parse PDF layouts (headers, paragraphs, tables) and produce semantically grouped chunks. Falls back to `SlidingWindowChunker` for oversized blocks or when Docling is unavailable. |
-| **Embedding** | `FastEmbedEmbedder` + `SparseBM25Embedder` | Generates dense vectors (BAAI/bge-m3) and sparse BM25 vectors concurrently using ONNX Runtime. No PyTorch dependency required at inference time. |
+| **Embedding** | `SentenceTransformerEmbedder` + `SparseBM25Embedder` | Generates dense vectors (BAAI/bge-m3) via SentenceTransformers (PyTorch) and sparse BM25 vectors via FastEmbed (ONNX) concurrently. |
 | **Storage** | `QdrantVectorStore` | Upserts chunks with deterministic UUID-v5 point IDs to Qdrant Cloud. Supports both cloud mode (URL + API key) and in-memory mode for testing. |
 | **Retrieval** | `HybridRetriever` | Fetches dense and sparse results independently, applies min-max normalization, and fuses scores with configurable weights (default: dense=1.0, sparse=0.3). |
 
