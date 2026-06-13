@@ -675,7 +675,7 @@
 
     <script>
         // ── Config ──
-        const API_BASE = new URLSearchParams(window.location.search).get('api') || 'http://localhost:8000';
+        const API_BASE = new URLSearchParams(window.location.search).get('api') || 'https://trinetra-dev-arxiv-scholar.hf.space';
 
         // ── DOM Refs ──
         const form          = document.getElementById('search-form');
@@ -834,6 +834,12 @@
                                 hide(statusText);
                                 answerBody.innerHTML = renderMarkdown(rawAnswer);
                                 latencyEl.textContent = `Completed in ${(event.latency_ms / 1000).toFixed(2)}s`;
+                                
+                                // Hide sources if the LLM determined they were completely irrelevant
+                                if (rawAnswer.includes("I could not find any matching papers")) {
+                                    hide(sourcesSection);
+                                }
+                                
                                 show(footerBar);
                                 break;
 
