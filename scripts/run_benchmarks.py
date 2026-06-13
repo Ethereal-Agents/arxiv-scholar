@@ -62,8 +62,8 @@ async def run_evaluation(data_file: str, collection_name: str):
         
     retriever = Orchestrator(
         collection_name=collection_name, 
-        qdrant_host=config.QDRANT_HOST, 
-        qdrant_port=config.QDRANT_PORT,
+        qdrant_host=config.AppConfig().qdrant_host, 
+        qdrant_port=config.AppConfig().qdrant_port,
         reranker_model_name="jinaai/jina-reranker-v1-tiny-en"
     )
     
@@ -251,8 +251,8 @@ async def main_async():
         from arxiv_scholar.retrieval.retrieval import HybridRetriever
         retriever = HybridRetriever(
             collection_name=args.collection,
-            qdrant_host=config.QDRANT_HOST,
-            qdrant_port=config.QDRANT_PORT
+            qdrant_host=config.AppConfig().qdrant_host,
+            qdrant_port=config.AppConfig().qdrant_port
         )
         
         await run_alpha_sweep(

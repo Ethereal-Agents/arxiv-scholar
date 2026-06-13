@@ -37,11 +37,11 @@ class HybridRetriever:
         
         # 1. Initialize the Qdrant client
         if location:
-            self.client = QdrantClient(location=location)
+            self.client = QdrantClient(location=location, timeout=60.0)
         elif qdrant_url and qdrant_api_key:
-            self.client = QdrantClient(url=qdrant_url, api_key=qdrant_api_key)
+            self.client = QdrantClient(url=qdrant_url, api_key=qdrant_api_key, timeout=60.0)
         else:
-            self.client = QdrantClient(host=qdrant_host, port=qdrant_port)
+            self.client = QdrantClient(host=qdrant_host, port=qdrant_port, timeout=60.0)
             
         logger.info(f"Initialized QdrantClient for collection '{collection_name}'")
 
@@ -56,8 +56,13 @@ class HybridRetriever:
         self.reranker_truncation_length = reranker_truncation_length
         self.reranker_fetch_multiplier = reranker_fetch_multiplier
         if use_reranker and reranker_model_name:
-            logger.info(f"Loading fastembed reranker model: {reranker_model_name}")
-            self.reranker_model = TextCrossEncoder(model_name=reranker_model_name)
+            try:
+                from fastembed.rerank.cross_encoder import TextCrossEncoder
+                logger.info(f"Loading fastembed reranker model: {reranker_model_name}")
+                self.reranker_model = TextCrossEncoder(model_name=reranker_model_name)
+            except ImportError:
+                logger.warning("fastembed not installed. Reranker disabled.")
+                self.reranker_model = None
 
         logger.info(f"Loading dense model: {dense_model_name}")
         if "bge-m3" in dense_model_name.lower():
@@ -155,25 +160,50 @@ class HybridRetriever:
         
         # 6. Fetch independently and fuse manually with Min-Max normalization
         # We batch both queries into a single network round-trip to minimize latency
-        batch_responses = self.client.query_batch_points(
-            collection_name=self.collection_name,
-            requests=[
-                models.QueryRequest(
-                    query=dense_vector,
-                    using="",
-                    limit=fetch_limit,
-                    filter=qdrant_filter,
-                    with_payload=True,
-                ),
-                models.QueryRequest(
-                    query=sparse_vector,
-                    using="bm25",
-                    limit=fetch_limit,
-                    filter=qdrant_filter,
-                    with_payload=True,
+        try:
+            batch_responses = self.client.query_batch_points(
+                collection_name=self.collection_name,
+                requests=[
+                    models.QueryRequest(
+                        query=dense_vector,
+                        using="",
+                        limit=fetch_limit,
+                        filter=qdrant_filter,
+                        with_payload=True,
+                    ),
+                    models.QueryRequest(
+                        query=sparse_vector,
+                        using="bm25",
+                        limit=fetch_limit,
+                        filter=qdrant_filter,
+                        with_payload=True,
+                    )
+                ]
+            )
+        except Exception as e:
+            if "Bad request" in str(e) or "Index required" in str(e):
+                logger.warning(f"Qdrant rejected filters (likely LLM hallucination). Falling back to no filters. Error: {e}")
+                batch_responses = self.client.query_batch_points(
+                    collection_name=self.collection_name,
+                    requests=[
+                        models.QueryRequest(
+                            query=dense_vector,
+                            using="",
+                            limit=fetch_limit,
+                            filter=None,
+                            with_payload=True,
+                        ),
+                        models.QueryRequest(
+                            query=sparse_vector,
+                            using="bm25",
+                            limit=fetch_limit,
+                            filter=None,
+                            with_payload=True,
+                        )
+                    ]
                 )
-            ]
-        )
+            else:
+                raise
         
         dense_response = batch_responses[0]
         sparse_response = batch_responses[1]
