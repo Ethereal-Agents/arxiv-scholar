@@ -29,10 +29,20 @@ def setup_clients():
         base_url="https://openrouter.ai/api/v1",
         api_key=api_key
     )
-    qdrant_client_obj = QdrantClient(host=config.QDRANT_HOST, port=config.QDRANT_PORT)
+    cfg = config.AppConfig()
     
-    dense_embedder = FastEmbedEmbedder(model_name=config.EMBEDDING_MODEL)
-    sparse_embedder = SparseBM25Embedder()
+    if cfg.qdrant_url and cfg.qdrant_api_key:
+        qdrant_client_obj = QdrantClient(url=cfg.qdrant_url, api_key=cfg.qdrant_api_key, timeout=cfg.qdrant_timeout)
+    else:
+        qdrant_client_obj = QdrantClient(host=cfg.qdrant_host, port=cfg.qdrant_port, timeout=cfg.qdrant_timeout)
+    
+    if "bge-m3" in cfg.embedding_model.lower():
+        from arxiv_scholar.embedding.st_embedder import SentenceTransformerEmbedder
+        dense_embedder = SentenceTransformerEmbedder(model_name=cfg.embedding_model)
+    else:
+        dense_embedder = FastEmbedEmbedder(model_name=cfg.embedding_model)
+        
+    sparse_embedder = SparseBM25Embedder(model_name=cfg.sparse_embedding_model)
     
     return llm_client, qdrant_client_obj, dense_embedder, sparse_embedder
 
