@@ -834,6 +834,12 @@
                                 hide(statusText);
                                 answerBody.innerHTML = renderMarkdown(rawAnswer);
                                 latencyEl.textContent = `Completed in ${(event.latency_ms / 1000).toFixed(2)}s`;
+                                
+                                // Hide sources if the LLM determined they were completely irrelevant
+                                if (rawAnswer.includes("I could not find any matching papers")) {
+                                    hide(sourcesSection);
+                                }
+                                
                                 show(footerBar);
                                 break;
 
