@@ -24,6 +24,7 @@ class HybridRetriever:
         qdrant_port: int = 6333,
         qdrant_url: str = "",
         qdrant_api_key: str = "",
+        qdrant_timeout: float = 60.0,
         location: str = None,
         dense_model_name: str = "BAAI/bge-m3",
         sparse_model_name: str = "Qdrant/bm25",
@@ -37,11 +38,11 @@ class HybridRetriever:
         
         # 1. Initialize the Qdrant client
         if location:
-            self.client = QdrantClient(location=location, timeout=60.0)
+            self.client = QdrantClient(location=location, timeout=qdrant_timeout)
         elif qdrant_url and qdrant_api_key:
-            self.client = QdrantClient(url=qdrant_url, api_key=qdrant_api_key, timeout=60.0)
+            self.client = QdrantClient(url=qdrant_url, api_key=qdrant_api_key, timeout=qdrant_timeout)
         else:
-            self.client = QdrantClient(host=qdrant_host, port=qdrant_port, timeout=60.0)
+            self.client = QdrantClient(host=qdrant_host, port=qdrant_port, timeout=qdrant_timeout)
             
         logger.info(f"Initialized QdrantClient for collection '{collection_name}'")
 

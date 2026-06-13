@@ -21,6 +21,7 @@ class AppConfig:
     qdrant_host: str = field(default_factory=lambda: os.getenv("QDRANT_HOST", "localhost"))
     qdrant_port: int = field(default_factory=lambda: int(os.getenv("QDRANT_PORT", "6333")))
     qdrant_collection: str = field(default_factory=lambda: os.getenv("QDRANT_COLLECTION", "Arxiv-Scholar"))
+    qdrant_timeout: float = field(default_factory=lambda: float(os.getenv("QDRANT_TIMEOUT", "60.0")))
 
     # Retrieval & Reranker Configuration
     use_reranker: bool = field(default_factory=lambda: os.getenv("USE_RERANKER", "False").lower() == "true")

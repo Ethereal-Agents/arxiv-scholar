@@ -32,9 +32,9 @@ def setup_clients():
     cfg = config.AppConfig()
     
     if cfg.qdrant_url and cfg.qdrant_api_key:
-        qdrant_client_obj = QdrantClient(url=cfg.qdrant_url, api_key=cfg.qdrant_api_key, timeout=60.0)
+        qdrant_client_obj = QdrantClient(url=cfg.qdrant_url, api_key=cfg.qdrant_api_key, timeout=cfg.qdrant_timeout)
     else:
-        qdrant_client_obj = QdrantClient(host=cfg.qdrant_host, port=cfg.qdrant_port, timeout=60.0)
+        qdrant_client_obj = QdrantClient(host=cfg.qdrant_host, port=cfg.qdrant_port, timeout=cfg.qdrant_timeout)
     
     if "bge-m3" in cfg.embedding_model.lower():
         from arxiv_scholar.embedding.st_embedder import SentenceTransformerEmbedder

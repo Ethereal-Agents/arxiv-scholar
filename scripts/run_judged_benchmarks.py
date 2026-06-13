@@ -88,6 +88,7 @@ async def run_judged_evaluation(data_file: str, collection_name: str):
         qdrant_port=config.AppConfig().qdrant_port,
         qdrant_url=config.AppConfig().qdrant_url,
         qdrant_api_key=config.AppConfig().qdrant_api_key,
+        qdrant_timeout=config.AppConfig().qdrant_timeout,
         reranker_model_name="jinaai/jina-reranker-v1-tiny-en",
         use_reranker=True
     )
