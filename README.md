@@ -193,8 +193,8 @@ export EMBEDDING_BACKEND="fastembed"            # or "sentence-transformers"
 export EMBEDDING_MODEL="BAAI/bge-m3"
 export SPARSE_EMBEDDING_MODEL="Qdrant/bm25"
 export USE_RERANKER="False"                     # Disabled — causes performance degradation
-export DENSE_WEIGHT="1.0"
-export SPARSE_WEIGHT="0.3"
+export DENSE_WEIGHT="0.6"
+export SPARSE_WEIGHT="0.4"
 
 # For local Qdrant (alternative to cloud)
 export QDRANT_HOST="localhost"

@@ -1,5 +1,8 @@
 import os
 from dataclasses import dataclass, field
+from dotenv import load_dotenv
+
+load_dotenv()
 
 @dataclass
 class AppConfig:
@@ -30,8 +33,8 @@ class AppConfig:
     reranker_fetch_multiplier: int = field(default_factory=lambda: int(os.getenv("RERANKER_FETCH_MULTIPLIER", "4")))
     
     # Hybrid fusion weights
-    dense_weight: float = field(default_factory=lambda: float(os.getenv("DENSE_WEIGHT", "1.0")))
-    sparse_weight: float = field(default_factory=lambda: float(os.getenv("SPARSE_WEIGHT", "0.3")))
+    dense_weight: float = field(default_factory=lambda: float(os.getenv("DENSE_WEIGHT", "0.6")))
+    sparse_weight: float = field(default_factory=lambda: float(os.getenv("SPARSE_WEIGHT", "0.4")))
 
     # Paths
     download_dir: str = field(default_factory=lambda: os.getenv("DOWNLOAD_DIR", "data/papers"))
