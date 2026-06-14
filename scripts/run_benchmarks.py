@@ -61,9 +61,11 @@ async def run_evaluation(data_file: str, collection_name: str):
     queries = [q for q in queries if q.get("query_type") == "standard"]
         
     retriever = Orchestrator(
-        collection_name=collection_name, 
+        collection_name=collection_name,
         qdrant_host=config.AppConfig().qdrant_host, 
         qdrant_port=config.AppConfig().qdrant_port,
+        qdrant_url=config.AppConfig().qdrant_url,
+        qdrant_api_key=config.AppConfig().qdrant_api_key,
         qdrant_timeout=config.AppConfig().qdrant_timeout,
         reranker_model_name="jinaai/jina-reranker-v1-tiny-en"
     )
@@ -254,6 +256,8 @@ async def main_async():
             collection_name=args.collection,
             qdrant_host=config.AppConfig().qdrant_host,
             qdrant_port=config.AppConfig().qdrant_port,
+            qdrant_url=config.AppConfig().qdrant_url,
+            qdrant_api_key=config.AppConfig().qdrant_api_key,
             qdrant_timeout=config.AppConfig().qdrant_timeout
         )
         

@@ -71,7 +71,7 @@ def calculate_ndcg_graded(grades, k=10):
         
     return dcg / idcg if idcg > 0 else 0.0
 
-async def run_judged_evaluation(data_file: str, collection_name: str):
+async def run_judged_evaluation(data_file: str, collection_name: str, log_file: str = None):
     logger.info(f"Loading eval dataset: {data_file}")
     if not os.path.exists(data_file):
         raise FileNotFoundError(f"Missing {data_file}.")
@@ -114,8 +114,14 @@ async def run_judged_evaluation(data_file: str, collection_name: str):
     base_latencies = []
     rr_latencies = []
     
+    if log_file:
+        log_f = open(log_file, "w")
+    else:
+        log_f = None
+    
     logger.info(f"Running LLM-judged benchmarking against {collection_name} for {len(queries)} queries...")
     for q in tqdm(queries):
+        query_id = q.get("query_id", "unknown")
         query_text = q["query"]
         target_id = q["positive_chunk"]["chunk_id"]
         
@@ -127,13 +133,20 @@ async def run_judged_evaluation(data_file: str, collection_name: str):
         chunks_text = [res["text"] for res in results]
         
         # Base Metrics
-        base_point_recalls.append(1.0 if str(target_id) in retrieved_ids[:20] else 0.0)
+        base_pr20 = 1.0 if str(target_id) in retrieved_ids[:20] else 0.0
+        base_point_recalls.append(base_pr20)
+        
         grades = await rate_chunks_batch(llm_service, query_text, chunks_text)
         
-        base_jr10.append(1.0 if any(g >= 1 for g in grades[:10]) else 0.0)
-        base_jr20.append(1.0 if any(g >= 1 for g in grades[:20]) else 0.0)
-        base_ndcgs10.append(calculate_ndcg_graded(grades, k=10))
-        base_ndcgs20.append(calculate_ndcg_graded(grades, k=20))
+        b_jr10 = 1.0 if any(g >= 1 for g in grades[:10]) else 0.0
+        b_jr20 = 1.0 if any(g >= 1 for g in grades[:20]) else 0.0
+        b_ndcg10 = calculate_ndcg_graded(grades, k=10)
+        b_ndcg20 = calculate_ndcg_graded(grades, k=20)
+        
+        base_jr10.append(b_jr10)
+        base_jr20.append(b_jr20)
+        base_ndcgs10.append(b_ndcg10)
+        base_ndcgs20.append(b_ndcg20)
         
         # Reranked Metrics (ZERO extra LLM calls!)
         grade_map = {res["chunk_id"]: grades[i] for i, res in enumerate(results)}
@@ -148,14 +161,48 @@ async def run_judged_evaluation(data_file: str, collection_name: str):
         # Map the cached grades to the newly sorted array
         reranked_grades = [grade_map.get(cid, 0) for cid in reranked_ids]
         
-        rr_point_recalls.append(1.0 if str(target_id) in reranked_ids[:20] else 0.0)
-        rr_jr10.append(1.0 if any(g >= 1 for g in reranked_grades[:10]) else 0.0)
-        rr_jr20.append(1.0 if any(g >= 1 for g in reranked_grades[:20]) else 0.0)
-        rr_ndcgs10.append(calculate_ndcg_graded(reranked_grades, k=10))
-        rr_ndcgs20.append(calculate_ndcg_graded(reranked_grades, k=20))
+        rr_pr20 = 1.0 if str(target_id) in reranked_ids[:20] else 0.0
+        r_jr10 = 1.0 if any(g >= 1 for g in reranked_grades[:10]) else 0.0
+        r_jr20 = 1.0 if any(g >= 1 for g in reranked_grades[:20]) else 0.0
+        r_ndcg10 = calculate_ndcg_graded(reranked_grades, k=10)
+        r_ndcg20 = calculate_ndcg_graded(reranked_grades, k=20)
+        
+        rr_point_recalls.append(rr_pr20)
+        rr_jr10.append(r_jr10)
+        rr_jr20.append(r_jr20)
+        rr_ndcgs10.append(r_ndcg10)
+        rr_ndcgs20.append(r_ndcg20)
         
         base_latencies.append(latency)
         rr_latencies.append(rr_latency)
+        
+        if log_f:
+            log_entry = {
+                "query_id": query_id,
+                "query": query_text,
+                "target_chunk_id": target_id,
+                "base_results": [
+                    {"chunk_id": res["chunk_id"], "score": float(res["score"]), "grade": int(g)}
+                    for res, g in zip(results, grades)
+                ],
+                "reranked_results": [
+                    {"chunk_id": res["chunk_id"], "score": float(res["score"]), "grade": int(g)}
+                    for res, g in zip(reranked_results, reranked_grades)
+                ],
+                "metrics": {
+                    "base_pr20": base_pr20,
+                    "base_jr10": b_jr10,
+                    "base_ndcg10": b_ndcg10,
+                    "rr_pr20": rr_pr20,
+                    "rr_jr10": r_jr10,
+                    "rr_ndcg10": r_ndcg10
+                }
+            }
+            log_f.write(json.dumps(log_entry) + "\n")
+            log_f.flush()
+            
+    if log_f:
+        log_f.close()
         
     p95_base_lat = np.percentile(base_latencies, 95) * 1000
     p95_rr_lat = np.percentile(rr_latencies, 95) * 1000
@@ -186,9 +233,10 @@ async def main_async():
     parser = argparse.ArgumentParser()
     parser.add_argument("--data", default="data/eval_dataset.jsonl")
     parser.add_argument("--collection", default="arxiv_papers", help="Target collection name.")
+    parser.add_argument("--log_file", default=None, help="Path to JSONL file where detailed metrics and logs will be saved.")
     args = parser.parse_args()
     
-    results = await run_judged_evaluation(args.data, args.collection)
+    results = await run_judged_evaluation(args.data, args.collection, args.log_file)
     
     print("\n" + "="*110)
     print("JUDGED BENCHMARK RESULTS")

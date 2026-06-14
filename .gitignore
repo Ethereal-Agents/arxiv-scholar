@@ -24,3 +24,6 @@ data/*
 analysis/
 snapshots/
 
+.env
+LLM_KEY
+

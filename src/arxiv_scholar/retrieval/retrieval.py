@@ -102,7 +102,7 @@ class HybridRetriever:
                 raise
             logger.warning(f"Could not validate collection dimensions during init: {e}")
 
-    def retrieve(self, query_text: str, limit: int = 20, use_reranker: bool = None, dense_query_text: str = None, filters: Dict[str, Any] = None, dense_weight: float = 1.0, sparse_weight: float = 0.3) -> List[Dict[str, Any]]:
+    def retrieve(self, query_text: str, limit: int = 20, use_reranker: bool = None, dense_query_text: str = None, filters: Dict[str, Any] = None, dense_weight: float = 0.6, sparse_weight: float = 0.4) -> List[Dict[str, Any]]:
         """Executes a hybrid search query with server-side RRF.
         
         Args:
