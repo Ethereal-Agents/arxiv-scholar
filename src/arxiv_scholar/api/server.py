@@ -163,7 +163,7 @@ if _docs_dir.is_dir():
     app.mount("/", StaticFiles(directory=str(_docs_dir), html=True), name="static")
 
 # Mount the MCP server to use the modern Streamable HTTP protocol
-app.mount("/mcp", mcp.streamable_http_app())
+app.mount("/mcp", mcp.sse_app(mount_path="/mcp"))
 
 if __name__ == "__main__":
     import uvicorn
