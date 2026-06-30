@@ -12,7 +12,12 @@ class Route(Enum):
     HYDE = "hyde"
 
 class MLQueryRouter:
-    def __init__(self, model_path: str = "data/router_dataset/query_router_model.joblib"):
+    def __init__(self, model_path: str = None):
+        if model_path is None:
+            # src/arxiv_scholar/retrieval/router.py -> up 3 levels to project root
+            project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+            model_path = os.path.join(project_root, "data", "router_dataset", "query_router_model.joblib")
+            
         self.classifier = None
         if os.path.exists(model_path):
             try:

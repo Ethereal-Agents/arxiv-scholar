@@ -3,6 +3,9 @@ import asyncio
 import os
 import time
 
+import sys
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "src")))
+
 from configs.config import AppConfig
 from arxiv_scholar.retrieval.orchestrator import Orchestrator
 from arxiv_scholar.llm.service import LLMService
