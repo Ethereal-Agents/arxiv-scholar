@@ -22,6 +22,7 @@ from arxiv_scholar.api.schema import (
     StreamTokenEvent, 
     StreamDoneEvent
 )
+from arxiv_scholar.mcp_server.server import mcp, set_orchestrator_getter
 from configs.config import AppConfig
 
 logger = logging.getLogger(__name__)
@@ -53,6 +54,7 @@ async def lifespan(app: FastAPI):
     
     app_state["orchestrator"] = orchestrator
     app_state["llm_service"] = orchestrator.llm_service
+    set_orchestrator_getter(lambda: app_state.get("orchestrator"))
     
     yield
     
@@ -159,6 +161,9 @@ async def query_endpoint(request: Request, body: QueryRequest):
 _docs_dir = Path(__file__).resolve().parents[3] / "docs"
 if _docs_dir.is_dir():
     app.mount("/", StaticFiles(directory=str(_docs_dir), html=True), name="static")
+
+# Mount the MCP server to use the modern Streamable HTTP protocol
+app.mount("/mcp", mcp.get_starlette_app())
 
 if __name__ == "__main__":
     import uvicorn
