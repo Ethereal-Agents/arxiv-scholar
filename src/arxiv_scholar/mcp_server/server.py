@@ -106,30 +106,3 @@ async def synthesize_answer(query: str, limit: int = 5) -> str:
 def get_system_stats() -> str:
     """Returns current status of the MCP server."""
     return "ArXiv Scholar MCP Server is running and connected to the main Orchestrator instance."
-
-if __name__ == "__main__":
-    from configs.config import AppConfig
-    from arxiv_scholar.retrieval.orchestrator import Orchestrator
-
-    # Initialize the orchestrator for local stdio mode (e.g. for MCP Inspector)
-    config = AppConfig()
-    orchestrator = Orchestrator(
-        collection_name=config.qdrant_collection,
-        qdrant_host=config.qdrant_host,
-        qdrant_port=config.qdrant_port,
-        qdrant_url=config.qdrant_url,
-        qdrant_api_key=config.qdrant_api_key,
-        dense_model_name=config.embedding_model,
-        sparse_model_name=config.sparse_embedding_model,
-        reranker_model_name=config.reranker_model,
-        use_reranker=config.use_reranker,
-        reranker_truncation_length=config.reranker_truncation_length,
-        reranker_fetch_multiplier=config.reranker_fetch_multiplier,
-        llm_api_key=config.llm_api_key,
-        llm_base_url=config.llm_base_url,
-        llm_model=config.llm_model
-    )
-    set_orchestrator_getter(lambda: orchestrator)
-    
-    # Run the server using standard I/O
-    mcp.run()
