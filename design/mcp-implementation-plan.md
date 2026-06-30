@@ -7,7 +7,7 @@ The goal is to expose the capabilities of the **ArXiv Scholar** RAG pipeline via
 Based on current best practices for building MCP servers in Python:
 - **Use `FastMCP`**: Leverage the `mcp` SDK's `FastMCP` abstraction. It provides FastAPI-like decorators (`@mcp.tool()`, `@mcp.resource()`) and handles the underlying JSON-RPC complexities.
 - **Dependency Management**: Use `uv` (which this project already utilizes) to manage dependencies and script execution safely.
-- **Transport Protocol (Streamable HTTP)**: For remote servers, use the modern **Streamable HTTP** specification rather than legacy SSE. Streamable HTTP unifies communication into a single endpoint, supports session IDs for better reliability against network drops, and plays nicer with CDNs, proxies, and firewalls.
+- **Transport Protocol (Standard SSE)**: For remote servers, use the **Standard Server-Sent Events (SSE)** transport instead of the custom Streamable HTTP protocol. Official MCP clients (Claude Desktop, Cursor, MCP Inspector) explicitly expect the standard `/sse` and `/messages` endpoints. Additionally, FastAPI mounts do not easily support the complex ASGI task group lifespans required by Streamable HTTP.
 - **Logging Safety (stdio)**: If you also support local `stdio` transport for desktop agents, **never use `print()`** or log to `stdout`, as this corrupts the JSON-RPC communication stream. All logging must be routed to `sys.stderr` or a dedicated log file.
 - **Idempotency & Isolation**: Design tools to be stateless. Agents might retry operations or call them in parallel.
 - **Explicit Inputs & Pydantic**: Require explicit inputs for tools. Use Pydantic models (already prevalent in this project) to strictly validate tool arguments.
@@ -86,8 +86,8 @@ When configuring for local agents like Claude Desktop, the config block should l
 }
 ```
 
-### Remote Agents (Streamable HTTP)
-For serving remote agents (e.g., exposing `arxiv-scholar` as an API), integrate `FastMCP` directly into your existing FastAPI application to use the unified Streamable HTTP endpoint:
+### Remote Agents (Standard SSE)
+For serving remote agents (e.g., exposing `arxiv-scholar` as an API), integrate `FastMCP` directly into your existing FastAPI application using the standard SSE transport:
 ```python
 # src/arxiv_scholar/api/server.py
 from fastapi import FastAPI
@@ -95,7 +95,10 @@ from arxiv_scholar.mcp_server.server import mcp
 
 app = FastAPI()
 
-# Mount the MCP server to use the modern Streamable HTTP protocol
-app.mount("/mcp", mcp.get_starlette_app())
+# Mount the MCP server to use standard SSE
+# WARNING: Do NOT pass `mount_path="/mcp"` to `sse_app()` here. FastAPI already handles the mount path in ASGI's `root_path`. Doing both results in a broken double-nested `/mcp/mcp/messages/` route.
+app.mount("/mcp", mcp.sse_app())
+
+# Note: Ensure any catch-all routes like StaticFiles mounts are placed AFTER the `/mcp` mount to prevent shadowing!
 ```
-This creates a robust, firewall-friendly single `/mcp/messages` endpoint for remote clients to connect and stream interactions using session IDs!
+This creates the standard `/mcp/sse` and `/mcp/messages` endpoints required by official MCP clients (e.g., the MCP Inspector) while avoiding complex lifespan and routing bugs.
