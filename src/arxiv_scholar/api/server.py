@@ -157,13 +157,13 @@ async def query_endpoint(request: Request, body: QueryRequest):
             
     return StreamingResponse(_stream_response(), media_type="text/event-stream")
 
-# Static file mount MUST come after route definitions to avoid shadowing /api/* routes
+# Mount the MCP server to use the modern Streamable HTTP protocol
+app.mount("/mcp", mcp.sse_app(mount_path="/mcp"))
+
+# Static file mount MUST come after ALL route and mount definitions to avoid shadowing them
 _docs_dir = Path(__file__).resolve().parents[3] / "docs"
 if _docs_dir.is_dir():
     app.mount("/", StaticFiles(directory=str(_docs_dir), html=True), name="static")
-
-# Mount the MCP server to use the modern Streamable HTTP protocol
-app.mount("/mcp", mcp.sse_app(mount_path="/mcp"))
 
 if __name__ == "__main__":
     import uvicorn
