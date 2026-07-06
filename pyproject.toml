@@ -25,10 +25,13 @@ dependencies = [
     "streamlit>=1.58.0",
     "slowapi>=0.1.9",
     "anthropic>=0.109.1",
+    "mcp[cli]>=1.28.0",
 ]
 
 [dependency-groups]
 dev = [
+    "pytest-asyncio>=1.4.0",
+    "pytest-cov>=7.1.0",
 ]
 
 [build-system]

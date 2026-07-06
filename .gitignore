@@ -27,3 +27,6 @@ snapshots/
 .env
 LLM_KEY
 
+# Coverage
+.coverage
+htmlcov/
