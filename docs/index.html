@@ -3,244 +3,192 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ArXiv Scholar — Open-Source Agentic Research Infrastructure</title>
-    <meta name="description" content="An open-source RAG pipeline that indexes academic papers from arXiv, enabling AI agents and researchers to retrieve precise, citation-filtered scientific knowledge.">
+    <title>Ethereal Agents - Infrastructure for autonomous AI agents</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         :root {
-            --primary: #0f172a;
-            --accent: #3b82f6;
-            --accent-dark: #2563eb;
-            --text: #334155;
+            --primary: #3b82f6;
+            --accent: #8b5cf6;
+            --text: #0f172a;
             --text-muted: #64748b;
-            --text-light: #94a3b8;
             --bg: #ffffff;
             --bg-offset: #f8fafc;
-            --bg-dark: #0f172a;
             --border: #e2e8f0;
             --radius: 12px;
         }
 
-        * { box-sizing: border-box; margin: 0; padding: 0; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-        html { scroll-behavior: smooth; }
+        html {
+            scroll-behavior: smooth;
+        }
 
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            line-height: 1.7;
+            font-family: 'Inter', sans-serif;
             color: var(--text);
-            background: var(--bg);
-            -webkit-font-smoothing: antialiased;
+            background-color: var(--bg);
+            line-height: 1.6;
         }
 
-        .container {
-            max-width: 1100px;
-            margin: 0 auto;
-            padding: 0 2rem;
+        a {
+            text-decoration: none;
+            color: inherit;
         }
 
-        /* ── Navbar ── */
+        ul {
+            list-style: none;
+        }
+
+        /* Navbar */
         .navbar {
             position: fixed;
             top: 0;
             left: 0;
-            right: 0;
-            z-index: 100;
-            background: rgba(255, 255, 255, 0.85);
-            backdrop-filter: blur(12px);
-            border-bottom: 1px solid var(--border);
-        }
-
-        .navbar .container {
+            width: 100%;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            height: 64px;
+            padding: 1rem 2rem;
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border);
+            z-index: 1000;
         }
 
-        .logo {
-            font-size: 1.15rem;
-            font-weight: 700;
-            color: var(--primary);
-            text-decoration: none;
-            letter-spacing: -0.5px;
+        .navbar-brand {
             display: flex;
             align-items: center;
             gap: 0.5rem;
+            font-weight: 700;
+            font-size: 1.25rem;
+            color: var(--text);
         }
 
         .logo-icon {
-            width: 28px;
-            height: 28px;
-            background: var(--accent);
-            border-radius: 6px;
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            color: white;
+            width: 32px;
+            height: 32px;
             display: flex;
             align-items: center;
             justify-content: center;
-            color: white;
+            border-radius: 8px;
             font-weight: 800;
-            font-size: 0.85rem;
         }
 
-        .nav-links {
+        .navbar-links {
             display: flex;
-            align-items: center;
             gap: 2rem;
+            font-weight: 500;
+            font-size: 0.95rem;
         }
 
-        .nav-links a {
-            text-decoration: none;
+        .navbar-links a {
             color: var(--text-muted);
-            font-size: 0.9rem;
-            font-weight: 500;
             transition: color 0.2s;
         }
 
-        .nav-links a:hover { color: var(--primary); }
+        .navbar-links a:hover {
+            color: var(--text);
+        }
+
+        /* Hero */
+        .hero {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: white;
+            padding: 10rem 2rem 6rem;
+            text-align: center;
+        }
+
+        .hero-container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .hero-badge {
+            display: inline-block;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 0.25rem 0.75rem;
+            border-radius: 999px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            margin-bottom: 1.5rem;
+            color: #e2e8f0;
+        }
+
+        .hero-title {
+            font-size: 3.5rem;
+            font-weight: 800;
+            line-height: 1.2;
+            margin-bottom: 1.5rem;
+            letter-spacing: -0.02em;
+        }
+
+        .hero-subtitle {
+            font-size: 1.25rem;
+            color: #cbd5e1;
+            margin-bottom: 2.5rem;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .hero-ctas {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+        }
 
         .btn {
             display: inline-flex;
             align-items: center;
-            gap: 0.5rem;
-            padding: 0.55rem 1.25rem;
+            justify-content: center;
+            padding: 0.75rem 1.5rem;
             border-radius: 8px;
-            text-decoration: none;
             font-weight: 600;
-            font-size: 0.9rem;
+            font-size: 1rem;
             transition: all 0.2s;
             cursor: pointer;
-            border: none;
         }
 
         .btn-primary {
-            background: var(--primary);
-            color: white;
+            background: white;
+            color: #0f172a;
         }
 
         .btn-primary:hover {
-            background: #1e293b;
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(15, 23, 42, 0.2);
+            background: #f8fafc;
+            transform: translateY(-2px);
         }
 
         .btn-outline {
             background: transparent;
-            color: var(--primary);
-            border: 1.5px solid var(--border);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
         }
 
         .btn-outline:hover {
-            border-color: var(--primary);
-            background: var(--bg-offset);
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateY(-2px);
         }
 
-        /* ── Hero ── */
-        .hero {
-            padding: 10rem 0 6rem;
-            text-align: center;
-        }
-
-        .hero-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            padding: 0.35rem 1rem;
-            background: #eff6ff;
-            color: var(--accent-dark);
-            border-radius: 100px;
-            font-size: 0.8rem;
-            font-weight: 600;
-            margin-bottom: 2rem;
-            border: 1px solid #bfdbfe;
-        }
-
-        .hero-badge .dot {
-            width: 6px;
-            height: 6px;
-            border-radius: 50%;
-            background: #22c55e;
-            animation: pulse 2s ease-in-out infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.4; }
-        }
-
-        .hero h1 {
-            font-size: 3.75rem;
-            font-weight: 800;
-            color: var(--primary);
-            line-height: 1.1;
-            letter-spacing: -0.03em;
-            max-width: 800px;
-            margin: 0 auto 1.5rem;
-        }
-
-        .hero p {
-            font-size: 1.2rem;
-            color: var(--text-muted);
-            max-width: 600px;
-            margin: 0 auto 2.5rem;
-        }
-
-        .hero-buttons {
-            display: flex;
-            justify-content: center;
-            gap: 1rem;
-        }
-
-        .github-icon {
-            width: 18px;
-            height: 18px;
-        }
-
-        /* ── Stats Bar ── */
-        .stats-bar {
-            border-top: 1px solid var(--border);
-            border-bottom: 1px solid var(--border);
-            padding: 2.5rem 0;
-        }
-
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            text-align: center;
-        }
-
-        .stat-item {
-            position: relative;
-        }
-
-        .stat-item:not(:last-child)::after {
-            content: '';
-            position: absolute;
-            right: 0;
-            top: 10%;
-            height: 80%;
-            width: 1px;
-            background: var(--border);
-        }
-
-        .stat-number {
-            font-size: 2rem;
-            font-weight: 800;
-            color: var(--primary);
-            letter-spacing: -0.02em;
-        }
-
-        .stat-label {
-            font-size: 0.85rem;
-            color: var(--text-muted);
-            font-weight: 500;
-            margin-top: 0.25rem;
-        }
-
-        /* ── Sections ── */
+        /* Sections */
         .section {
-            padding: 6rem 0;
+            padding: 6rem 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .section-bg-offset {
+            background-color: var(--bg-offset);
+            max-width: 100%;
         }
 
         .section-header {
@@ -249,837 +197,537 @@
         }
 
         .section-label {
-            font-size: 0.8rem;
-            font-weight: 700;
+            color: var(--primary);
+            font-weight: 600;
             text-transform: uppercase;
-            letter-spacing: 0.1em;
-            color: var(--accent);
-            margin-bottom: 0.75rem;
+            letter-spacing: 0.05em;
+            font-size: 0.875rem;
+            margin-bottom: 0.5rem;
         }
 
         .section-title {
-            font-size: 2.25rem;
+            font-size: 2.5rem;
             font-weight: 800;
-            color: var(--primary);
-            letter-spacing: -0.025em;
-            margin-bottom: 1rem;
+            color: var(--text);
+            letter-spacing: -0.01em;
         }
 
-        .section-desc {
-            font-size: 1.1rem;
-            color: var(--text-muted);
-            max-width: 600px;
-            margin: 0 auto;
-        }
-
-        /* ── Motivation ── */
-        .motivation-grid {
+        /* Products */
+        .products-grid {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 1.5rem;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 2rem;
         }
 
-        .motivation-card {
-            padding: 2rem;
+        .product-card {
+            background: white;
             border: 1px solid var(--border);
             border-radius: var(--radius);
-            transition: all 0.25s;
+            padding: 2rem;
+            transition: all 0.2s;
+            display: flex;
+            flex-direction: column;
         }
 
-        .motivation-card:hover {
-            border-color: var(--accent);
-            box-shadow: 0 4px 24px rgba(59, 130, 246, 0.08);
-            transform: translateY(-2px);
+        .product-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
         }
 
-        .motivation-icon {
-            font-size: 1.5rem;
+        .product-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
             margin-bottom: 1rem;
         }
 
-        .motivation-card h3 {
-            font-size: 1.1rem;
-            font-weight: 700;
-            color: var(--primary);
-            margin-bottom: 0.5rem;
+        .product-icon {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+            display: block;
         }
 
-        .motivation-card p {
-            font-size: 0.95rem;
-            color: var(--text-muted);
-            margin: 0;
-        }
-
-        /* ── Architecture ── */
-        .architecture {
-            background: var(--bg-offset);
-            border-top: 1px solid var(--border);
-            border-bottom: 1px solid var(--border);
-        }
-
-        .arch-pipeline {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 0;
-            position: relative;
-            margin-top: 1rem;
-        }
-
-        .arch-step {
-            text-align: center;
-            padding: 2rem 1.5rem;
-            position: relative;
-        }
-
-        .arch-step:not(:last-child)::after {
-            content: '→';
-            position: absolute;
-            right: -8px;
-            top: 50%;
-            transform: translateY(-50%);
+        .product-title {
             font-size: 1.5rem;
-            color: var(--text-light);
-            font-weight: 300;
+            font-weight: 700;
+            margin-bottom: 0.75rem;
         }
 
-        .arch-step-num {
-            width: 40px;
-            height: 40px;
-            border-radius: 10px;
-            background: var(--primary);
-            color: white;
+        .product-desc {
+            color: var(--text-muted);
+            margin-bottom: 1.5rem;
+            flex-grow: 1;
+        }
+
+        .status-badge {
             display: inline-flex;
             align-items: center;
-            justify-content: center;
-            font-weight: 700;
-            font-size: 0.9rem;
-            margin-bottom: 1rem;
-        }
-
-        .arch-step h4 {
-            font-size: 0.95rem;
-            font-weight: 700;
-            color: var(--primary);
-            margin-bottom: 0.5rem;
-        }
-
-        .arch-step p {
-            font-size: 0.85rem;
+            gap: 0.375rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 0.25rem 0.625rem;
+            border-radius: 999px;
+            background: #f1f5f9;
             color: var(--text-muted);
-            margin: 0;
         }
 
-        /* ── Timeline ── */
-        .timeline-wrapper {
-            max-width: 650px;
+        .status-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+        }
+
+        .status-live .status-dot {
+            background: #22c55e;
+            box-shadow: 0 0 0 rgba(34, 197, 94, 0.4);
+            animation: pulse-green 2s infinite;
+        }
+
+        .status-soon .status-dot {
+            background: #f59e0b;
+        }
+
+        @keyframes pulse-green {
+            0% {
+                box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
+            }
+            70% {
+                box-shadow: 0 0 0 6px rgba(34, 197, 94, 0);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(34, 197, 94, 0);
+            }
+        }
+
+        .product-highlights {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .highlight-pill {
+            font-size: 0.75rem;
+            font-weight: 500;
+            background: var(--bg-offset);
+            color: var(--text-muted);
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            border: 1px solid var(--border);
+        }
+
+        .product-links {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .product-link {
+            color: var(--primary);
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+
+        .product-link:hover {
+            text-decoration: underline;
+        }
+
+        .product-github {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+            font-weight: 500;
+        }
+        
+        .product-github:hover {
+            color: var(--text);
+        }
+
+        /* Mission */
+        .mission-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 2rem;
+            max-width: 1200px;
             margin: 0 auto;
         }
 
-        .timeline-item {
-            display: flex;
-            gap: 2rem;
-            padding-bottom: 2.5rem;
-            position: relative;
+        .mission-card {
+            text-align: center;
+            padding: 2rem;
         }
 
-        .timeline-item:last-child { padding-bottom: 0; }
-
-        .timeline-marker {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            flex-shrink: 0;
+        .mission-icon {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
         }
 
-        .timeline-dot {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            background: var(--accent);
-            border: 3px solid #dbeafe;
-            flex-shrink: 0;
-        }
-
-        .timeline-dot.completed {
-            background: #22c55e;
-            border-color: #dcfce7;
-        }
-
-        .timeline-dot.upcoming {
-            background: var(--text-light);
-            border-color: #e2e8f0;
-        }
-
-        .timeline-line {
-            width: 2px;
-            flex: 1;
-            background: var(--border);
-            margin-top: 0.5rem;
-        }
-
-        .timeline-item:last-child .timeline-line {
-            display: none;
-        }
-
-        .timeline-content h4 {
-            font-size: 1rem;
+        .mission-title {
+            font-size: 1.25rem;
             font-weight: 700;
-            color: var(--primary);
-            margin-bottom: 0.15rem;
+            margin-bottom: 1rem;
         }
 
-        .timeline-date {
-            font-size: 0.8rem;
-            color: var(--accent);
-            font-weight: 600;
-            margin-bottom: 0.5rem;
-        }
-
-        .timeline-content p {
-            font-size: 0.9rem;
+        .mission-desc {
             color: var(--text-muted);
-            margin: 0;
         }
 
-        .timeline-tag {
-            display: inline-block;
-            padding: 0.15rem 0.6rem;
-            border-radius: 100px;
-            font-size: 0.7rem;
-            font-weight: 600;
-            margin-left: 0.5rem;
-            vertical-align: middle;
-        }
-
-        .tag-done {
-            background: #dcfce7;
-            color: #166534;
-        }
-
-        .tag-active {
-            background: #dbeafe;
-            color: #1d4ed8;
-        }
-
-        .tag-soon {
-            background: #f1f5f9;
-            color: #475569;
-        }
-
-        /* ── Team ── */
-        .team {
-            background: var(--bg-offset);
+        /* Team */
+        .team-section {
             border-top: 1px solid var(--border);
             border-bottom: 1px solid var(--border);
         }
-
+        
         .team-grid {
             display: flex;
             justify-content: center;
-            gap: 3rem;
+            gap: 4rem;
+            max-width: 1200px;
+            margin: 0 auto;
         }
 
         .team-card {
             text-align: center;
-            padding: 2.5rem 2rem;
-            background: white;
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            min-width: 260px;
-            transition: all 0.25s;
-        }
-
-        .team-card:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
         }
 
         .team-avatar {
-            width: 72px;
-            height: 72px;
+            width: 96px;
+            height: 96px;
             border-radius: 50%;
-            background: linear-gradient(135deg, var(--accent), #8b5cf6);
+            margin: 0 auto 1.5rem;
             display: flex;
             align-items: center;
             justify-content: center;
+            font-size: 2rem;
+            font-weight: 700;
             color: white;
-            font-weight: 800;
-            font-size: 1.5rem;
-            margin: 0 auto 1.25rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
         }
 
-        .team-card h3 {
-            font-size: 1.1rem;
+        .avatar-ad {
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+        }
+
+        .avatar-td {
+            background: linear-gradient(135deg, #ec4899, #f59e0b);
+        }
+
+        .team-name {
+            font-size: 1.25rem;
             font-weight: 700;
-            color: var(--primary);
             margin-bottom: 0.25rem;
         }
 
         .team-role {
-            font-size: 0.85rem;
             color: var(--text-muted);
+            font-size: 0.95rem;
             margin-bottom: 1rem;
         }
 
         .linkedin-link {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.4rem;
-            text-decoration: none;
-            color: #0a66c2;
-            font-size: 0.85rem;
-            font-weight: 600;
-            transition: opacity 0.2s;
+            color: #0077b5;
+            display: inline-block;
+            transition: transform 0.2s;
         }
 
-        .linkedin-link:hover { opacity: 0.7; }
-
-        .linkedin-icon {
-            width: 16px;
-            height: 16px;
+        .linkedin-link:hover {
+            transform: scale(1.1);
         }
 
-        /* ── API Section ── */
-        .api-section {
-            background: var(--bg-dark);
-            padding: 6rem 0;
-        }
-
-        .api-section .section-label { color: #60a5fa; }
-
-        .api-section .section-title,
-        .api-section .section-desc { color: #e2e8f0; }
-
-        .api-section .section-desc { color: #94a3b8; }
-
-        .api-layout {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 3rem;
-            align-items: start;
-        }
-
-        .api-info {
-            display: flex;
-            flex-direction: column;
-            gap: 1.5rem;
-        }
-
-        .api-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            padding: 0.35rem 0.9rem;
-            background: rgba(34, 197, 94, 0.12);
-            border: 1px solid rgba(34, 197, 94, 0.3);
-            border-radius: 100px;
-            font-size: 0.78rem;
-            font-weight: 600;
-            color: #4ade80;
-            width: fit-content;
-        }
-
-        .api-badge .dot {
-            width: 6px;
-            height: 6px;
-            border-radius: 50%;
-            background: #22c55e;
-            animation: pulse 2s ease-in-out infinite;
-        }
-
-        .api-endpoint {
-            font-family: 'Courier New', monospace;
-            font-size: 0.82rem;
-            color: #60a5fa;
-            background: rgba(59, 130, 246, 0.08);
-            border: 1px solid rgba(59, 130, 246, 0.2);
-            border-radius: 8px;
-            padding: 0.6rem 1rem;
-            word-break: break-all;
-        }
-
-        .api-pills {
-            display: flex;
-            flex-direction: column;
-            gap: 0.75rem;
-        }
-
-        .api-pill {
-            display: flex;
-            align-items: flex-start;
-            gap: 0.75rem;
-            color: #cbd5e1;
-            font-size: 0.9rem;
-        }
-
-        .api-pill-icon {
-            font-size: 1rem;
-            margin-top: 0.1rem;
-            flex-shrink: 0;
-        }
-
-        .api-pill strong { color: #f1f5f9; }
-
-        .terminal {
-            background: #0d1117;
-            border: 1px solid #30363d;
-            border-radius: var(--radius);
-            overflow: hidden;
-            box-shadow: 0 24px 48px rgba(0,0,0,0.4);
-        }
-
-        .terminal-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0.75rem 1.25rem;
-            background: #161b22;
-            border-bottom: 1px solid #30363d;
-        }
-
-        .terminal-dots {
-            display: flex;
-            gap: 0.5rem;
-        }
-
-        .terminal-dots span {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-        }
-
-        .dot-red { background: #ff5f57; }
-        .dot-yellow { background: #febc2e; }
-        .dot-green { background: #28c840; }
-
-        .terminal-label {
-            font-size: 0.75rem;
-            color: #8b949e;
-            font-family: 'Courier New', monospace;
-        }
-
-        .copy-btn {
-            background: transparent;
-            border: 1px solid #30363d;
-            border-radius: 6px;
-            color: #8b949e;
-            font-size: 0.72rem;
-            padding: 0.25rem 0.6rem;
-            cursor: pointer;
-            transition: all 0.2s;
-            font-family: inherit;
-        }
-
-        .copy-btn:hover { border-color: #60a5fa; color: #60a5fa; }
-        .copy-btn.copied { border-color: #4ade80; color: #4ade80; }
-
-        .terminal-body {
-            padding: 1.5rem;
-            font-family: 'Courier New', monospace;
-            font-size: 0.82rem;
-            line-height: 1.8;
-            overflow-x: auto;
-        }
-
-        .token-cmd { color: #79c0ff; }
-        .token-flag { color: #d2a8ff; }
-        .token-url { color: #ffa657; }
-        .token-str { color: #a5f3a5; }
-        .token-key { color: #79c0ff; }
-        .token-num { color: #f8c555; }
-        .token-bool { color: #ff7b72; }
-        .token-comment { color: #8b949e; font-style: italic; }
-
-        @media (max-width: 768px) {
-            .api-layout { grid-template-columns: 1fr; }
-        }
-
-        /* ── Footer ── */
+        /* Footer */
         .footer {
-            background: var(--bg-dark);
-            color: #cbd5e1;
-            padding: 4rem 0;
+            background-color: #0f172a;
+            color: #94a3b8;
+            padding: 4rem 2rem 2rem;
         }
 
-        .footer-inner {
+        .footer-content {
+            max-width: 1200px;
+            margin: 0 auto;
             display: flex;
             justify-content: space-between;
-            align-items: center;
+            align-items: flex-start;
+            margin-bottom: 3rem;
+            flex-wrap: wrap;
+            gap: 2rem;
         }
 
-        .footer-logo {
-            font-size: 1rem;
+        .footer-brand {
+            font-size: 1.25rem;
             font-weight: 700;
             color: white;
-            letter-spacing: -0.5px;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
         }
 
+        .footer-links {
+            display: flex;
+            gap: 2rem;
+        }
+        
+        .footer-links-col {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+        
         .footer-links a {
-            text-decoration: none;
-            color: #94a3b8;
-            font-size: 0.85rem;
-            margin-left: 1.5rem;
             transition: color 0.2s;
         }
-
-        .footer-links a:hover { color: white; }
-
-        .footer-copy {
-            text-align: center;
-            margin-top: 2.5rem;
-            padding-top: 2rem;
-            border-top: 1px solid #1e293b;
-            font-size: 0.8rem;
-            color: #475569;
+        
+        .footer-links a:hover {
+            color: white;
         }
 
-        /* ── Responsive ── */
+        .footer-bottom {
+            max-width: 1200px;
+            margin: 0 auto;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            padding-top: 2rem;
+            text-align: center;
+            font-size: 0.875rem;
+        }
+
+        /* Responsive */
         @media (max-width: 768px) {
-            .hero h1 { font-size: 2.5rem; }
-            .hero-buttons { flex-direction: column; align-items: center; }
-            .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 2rem; }
-            .stat-item:not(:last-child)::after { display: none; }
-            .motivation-grid { grid-template-columns: 1fr; }
-            .arch-pipeline { grid-template-columns: 1fr; }
-            .arch-step:not(:last-child)::after { content: '↓'; right: auto; bottom: -8px; top: auto; transform: none; left: 50%; }
-            .team-grid { flex-direction: column; align-items: center; }
-            .footer-inner { flex-direction: column; gap: 1.5rem; text-align: center; }
-            .footer-links a { margin: 0 0.75rem; }
-            /* Navbar: hide all text links AND the Try Search outline btn — only GitHub remains */
-            .nav-links a:not(.btn-primary) { display: none; }
-            .nav-links { gap: 0.5rem; }
+            .navbar {
+                padding: 1rem;
+            }
+            .navbar-links {
+                display: none;
+            }
+            
+            .hero {
+                padding: 8rem 1rem 4rem;
+            }
+            .hero-title {
+                font-size: 2.5rem;
+            }
+            .hero-ctas {
+                flex-direction: column;
+            }
+            
+            .products-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .mission-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .team-grid {
+                flex-direction: column;
+                gap: 3rem;
+            }
+            
+            .footer-content {
+                flex-direction: column;
+            }
         }
     </style>
 </head>
 <body>
 
-    <!-- Navbar -->
     <nav class="navbar">
-        <div class="container">
-            <a href="#" class="logo">
-                <div class="logo-icon">A</div>
-                ArXiv Scholar
-            </a>
-            <div class="nav-links">
-                <a href="#motivation">Motivation</a>
-                <a href="#architecture">Architecture</a>
-                <a href="#api">API</a>
-                <a href="#roadmap">Roadmap</a>
-                <a href="#team">Team</a>
-                <a href="blog/launching-arxiv-scholar.html">Blog</a>
-                <a href="search.html" class="btn btn-outline" style="margin-right:-0.5rem">Try Search</a>
-                <a href="https://github.com/Ethereal-Agents/arxiv-scholar" target="_blank" class="btn btn-primary">
-                    <svg class="github-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
-                    GitHub
-                </a>
-            </div>
+        <a href="#" class="navbar-brand">
+            <div class="logo-icon">E</div>
+            Ethereal Agents
+        </a>
+        <div class="navbar-links">
+            <a href="#products">Products</a>
+            <a href="blog/launching-arxiv-scholar.html">Blog</a>
+            <a href="https://github.com/Ethereal-Agents" target="_blank">GitHub</a>
         </div>
     </nav>
 
-    <!-- Hero -->
     <section class="hero">
-        <div class="container">
-            <div class="hero-badge">
-                <span class="dot"></span>
-                Live — 5.6K AI Engineering Papers Indexed
-            </div>
-            <h1>Precise retrieval for the world's scientific knowledge.</h1>
-            <p>An open-source RAG infrastructure that indexes curated AI Engineering papers from arXiv, enabling researchers and AI agents to retrieve high-signal academic literature without hallucinations.</p>
-            <div class="hero-buttons">
-                <a href="search.html" class="btn btn-primary">
-                    🔍 Try It Now
-                </a>
-                <a href="https://github.com/Ethereal-Agents/arxiv-scholar" target="_blank" class="btn btn-outline">
-                    <svg class="github-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
-                    View Repository
-                </a>
-                <a href="#architecture" class="btn btn-outline">How It Works</a>
+        <div class="hero-container">
+            <div class="hero-badge">🚀 Open Source &middot; Building in Public</div>
+            <h1 class="hero-title">Building the infrastructure for autonomous AI agents.</h1>
+            <p class="hero-subtitle">We build open-source tools and systems that give AI agents memory, retrieval, and evaluation capabilities &mdash; enabling them to solve real-world engineering problems.</p>
+            <div class="hero-ctas">
+                <a href="#products" class="btn btn-primary">Explore Products</a>
+                <a href="https://github.com/Ethereal-Agents" target="_blank" class="btn btn-outline">GitHub</a>
             </div>
         </div>
     </section>
 
-    <!-- Stats -->
-    <section class="stats-bar">
-        <div class="container">
-            <div class="stats-grid">
-                <div class="stat-item">
-                    <div class="stat-number">~5.6K</div>
-                    <div class="stat-label">Indexed Papers</div>
+    <section id="products" class="section">
+        <div class="section-header">
+            <div class="section-label">Our Products</div>
+            <h2 class="section-title">Tools for the agentic era</h2>
+        </div>
+        
+        <div class="products-grid">
+            <!-- Card 1 -->
+            <div class="product-card">
+                <div class="product-header">
+                    <span class="product-icon">📚</span>
+                    <div class="status-badge status-live">
+                        <div class="status-dot"></div>
+                        Live
+                    </div>
                 </div>
-                <div class="stat-item">
-                    <div class="stat-number">AI Eng.</div>
-                    <div class="stat-label">Domain Focus</div>
+                <h3 class="product-title">ArXiv Scholar</h3>
+                <p class="product-desc">Open-source RAG infrastructure that indexes curated AI engineering papers from arXiv, enabling researchers and AI agents to retrieve precise, citation-filtered scientific knowledge.</p>
+                <div class="product-highlights">
+                    <span class="highlight-pill">~5.6K Papers Indexed</span>
+                    <span class="highlight-pill">98.8% Recall@20</span>
+                    <span class="highlight-pill">Hybrid Search + Re-ranking</span>
                 </div>
-                <div class="stat-item">
-                    <div class="stat-number">98.8%</div>
-                    <div class="stat-label">Judged Recall@20</div>
+                <div class="product-links">
+                    <a href="products/arxiv-scholar.html" class="product-link">View Product &rarr;</a>
+                    <a href="https://github.com/Ethereal-Agents/arxiv-scholar" target="_blank" class="product-github">GitHub</a>
                 </div>
-                <div class="stat-item">
-                    <div class="stat-number">MIT</div>
-                    <div class="stat-label">Open-Source License</div>
+            </div>
+
+            <!-- Card 2 -->
+            <div class="product-card">
+                <div class="product-header">
+                    <span class="product-icon">🧠</span>
+                    <div class="status-badge status-live">
+                        <div class="status-dot"></div>
+                        Live
+                    </div>
+                </div>
+                <h3 class="product-title">Nucleus</h3>
+                <p class="product-desc">A centralized, bi-temporal memory hub for AI coding agents. Automatically extracts structured knowledge from Git diffs and serves it to any team agent via the Model Context Protocol (MCP).</p>
+                <div class="product-highlights">
+                    <span class="highlight-pill">33% Token Reduction</span>
+                    <span class="highlight-pill">MCP-Native</span>
+                    <span class="highlight-pill">Bi-Temporal Store</span>
+                </div>
+                <div class="product-links">
+                    <a href="products/nucleus.html" class="product-link">View Product &rarr;</a>
+                    <a href="https://github.com/Ethereal-Agents/Nucleus" target="_blank" class="product-github">GitHub</a>
+                </div>
+            </div>
+
+            <!-- Card 3 -->
+            <div class="product-card">
+                <div class="product-header">
+                    <span class="product-icon">🤖</span>
+                    <div class="status-badge status-soon">
+                        <div class="status-dot"></div>
+                        Product Page Coming Soon
+                    </div>
+                </div>
+                <h3 class="product-title">Agent-1</h3>
+                <p class="product-desc">A minimal, high-performance ReAct coding agent that resolves real-world GitHub issues. Runs inside sandboxed Docker environments with optional persistent memory via Nucleus.</p>
+                <div class="product-highlights">
+                    <span class="highlight-pill">SWE-bench Compatible</span>
+                    <span class="highlight-pill">Docker Sandboxed</span>
+                    <span class="highlight-pill">Nucleus Memory Integration</span>
+                </div>
+                <div class="product-links">
+                    <a href="https://github.com/Ethereal-Agents/Agent-1" target="_blank" class="product-github">GitHub</a>
+                </div>
+            </div>
+
+            <!-- Card 4 -->
+            <div class="product-card">
+                <div class="product-header">
+                    <span class="product-icon">👥</span>
+                    <div class="status-badge status-soon">
+                        <div class="status-dot"></div>
+                        Product Page Coming Soon
+                    </div>
+                </div>
+                <h3 class="product-title">team-swe</h3>
+                <p class="product-desc">Cluster curation toolkit that mines structurally coherent task sequences from SWE-bench for multi-agent memory evaluation. Produces time-ordered task chains with high file-level and AST-level overlap.</p>
+                <div class="product-highlights">
+                    <span class="highlight-pill">File &amp; AST Overlap Detection</span>
+                    <span class="highlight-pill">Time-Ordered Chains</span>
+                    <span class="highlight-pill">75%+ Overlap Threshold</span>
+                </div>
+                <div class="product-links">
+                    <a href="https://github.com/Ethereal-Agents/team-swe" target="_blank" class="product-github">GitHub</a>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- Motivation -->
-    <section id="motivation" class="section">
-        <div class="container">
+    <div class="section-bg-offset">
+        <section class="section">
             <div class="section-header">
-                <div class="section-label">Why This Exists</div>
-                <h2 class="section-title">Bridging the Knowledge Gap</h2>
-                <p class="section-desc">LLMs hallucinate when asked about cutting-edge research. We solve this with a rigorously engineered retrieval pipeline over curated AI Engineering literature.</p>
+                <div class="section-label">Our Mission</div>
+                <h2 class="section-title">Why we build</h2>
             </div>
-            <div class="motivation-grid">
-                <div class="motivation-card">
-                    <div class="motivation-icon">🎯</div>
-                    <h3>High-Signal Filtering</h3>
-                    <p>Papers are curated using a multi-dimensional keyword and domain filtering system. Only papers matching rigorous AI engineering criteria — across RAG, LLMs, agents, training, and inference — are included.</p>
+            
+            <div class="mission-grid">
+                <div class="mission-card">
+                    <div class="mission-icon">🔬</div>
+                    <h3 class="mission-title">Research-First</h3>
+                    <p class="mission-desc">Every product is grounded in rigorous engineering and evaluated against established benchmarks. No hype, just measurable results.</p>
                 </div>
+                <div class="mission-card">
+                    <div class="mission-icon">🌐</div>
+                    <h3 class="mission-title">Open Source</h3>
+                    <p class="mission-desc">All our tools are open-source. We believe the best infrastructure is built transparently, with community collaboration.</p>
+                </div>
+                <div class="mission-card">
+                    <div class="mission-icon">🔗</div>
+                    <h3 class="mission-title">Composable</h3>
+                    <p class="mission-desc">Our products are designed to work together &mdash; Nucleus feeds Agent-1, team-swe evaluates them both, ArXiv Scholar provides the knowledge layer.</p>
+                </div>
+            </div>
+        </section>
+    </div>
 
-                <div class="motivation-card">
-                    <div class="motivation-icon">🤖</div>
-                    <h3>Agentic Research</h3>
-                    <p>Autonomous AI agents can independently query and synthesize literature through our API, accelerating automated scientific problem-solving and discovery workflows.</p>
-                </div>
-                <div class="motivation-card">
-                    <div class="motivation-icon">🛡️</div>
-                    <h3>Hallucination Prevention</h3>
-                    <p>Every response is grounded in real, cited academic work. No fabricated references, no outdated training cutoffs — just verified scientific knowledge.</p>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Architecture -->
-    <section id="architecture" class="section architecture">
-        <div class="container">
-            <div class="section-header">
-                <div class="section-label">Under the Hood</div>
-                <h2 class="section-title">Retrieval Architecture</h2>
-                <p class="section-desc">A multi-stage pipeline combining hybrid vector search, intelligent query routing, and LLM-powered decomposition.</p>
-            </div>
-            <div class="arch-pipeline">
-                <div class="arch-step">
-                    <div class="arch-step-num">1</div>
-                    <h4>Query Routing</h4>
-                    <p>Fast ML-based router classifies incoming queries as Direct, Decompose, or HyDE in &lt;1ms.</p>
-                </div>
-                <div class="arch-step">
-                    <div class="arch-step-num">2</div>
-                    <h4>LLM Decomposition</h4>
-                    <p>Complex queries are split into atomic sub-queries with metadata filters extracted via structured JSON.</p>
-                </div>
-                <div class="arch-step">
-                    <div class="arch-step-num">3</div>
-                    <h4>Hybrid Search</h4>
-                    <p>Dense embeddings (BGE) and sparse retrieval (BM25) are fused using calibrated alpha scaling (score weighting).</p>
-                </div>
-                <div class="arch-step">
-                    <div class="arch-step-num">4</div>
-                    <h4>Re-ranking</h4>
-                    <p>Cross-encoder (Jina) re-scores the retrieved chunks, ensuring the highest relevance context reaches the LLM.</p>
-                </div>
-
-            </div>
-        </div>
-    </section>
-
-    <!-- Try the API -->
-    <section id="api" class="api-section">
-        <div class="container">
-            <div class="section-header">
-                <div class="section-label">Developer Access</div>
-                <h2 class="section-title">Try the API</h2>
-                <p class="section-desc">Live endpoint on Hugging Face Spaces. No authentication required. Responses stream via Server-Sent Events.</p>
-            </div>
-            <div class="api-layout">
-                <div class="api-info">
-                    <div class="api-badge">
-                        <span class="dot"></span>
-                        Live &amp; Public
-                    </div>
-                    <div class="api-endpoint">POST https://trinetra-dev-arxiv-scholar.hf.space/api/v1/query</div>
-                    <div class="api-pills">
-                        <div class="api-pill">
-                            <span class="api-pill-icon">⚡</span>
-                            <span><strong>Streaming SSE</strong> — tokens stream back as they are generated, sources arrive first</span>
-                        </div>
-                        <div class="api-pill">
-                            <span class="api-pill-icon">🔀</span>
-                            <span><strong>Intelligent routing</strong> — queries are automatically classified as Direct, Decompose, or HyDE</span>
-                        </div>
-                        <div class="api-pill">
-                            <span class="api-pill-icon">📄</span>
-                            <span><strong>Grounded answers</strong> — every response is sourced from real arXiv papers with IDs attached</span>
-                        </div>
-                        <div class="api-pill">
-                            <span class="api-pill-icon">🛡️</span>
-                            <span><strong>Rate limited</strong> — 5 requests/minute per IP to keep the service fair for everyone</span>
-                        </div>
-                    </div>
-                </div>
-                <div class="terminal" id="api-terminal">
-                    <div class="terminal-header">
-                        <div class="terminal-dots">
-                            <span class="dot-red"></span>
-                            <span class="dot-yellow"></span>
-                            <span class="dot-green"></span>
-                        </div>
-                        <span class="terminal-label">curl</span>
-                        <button class="copy-btn" id="copy-curl-btn" onclick="copyCurl()">Copy</button>
-                    </div>
-                    <div class="terminal-body">
-<span class="token-cmd">curl</span> <span class="token-flag">-N -X POST</span> <span class="token-url">"https://trinetra-dev-arxiv-scholar.hf.space/api/v1/query"</span> <span class="token-flag">\</span>
-  <span class="token-flag">-H</span> <span class="token-str">"Content-Type: application/json"</span> <span class="token-flag">\</span>
-  <span class="token-flag">-d</span> <span class="token-str">'&#123;</span>
-    <span class="token-key">"query"</span>: <span class="token-str">"What is contrastive learning?"</span>,
-    <span class="token-key">"limit"</span>: <span class="token-num">5</span>,
-    <span class="token-key">"use_reranker"</span>: <span class="token-bool">false</span>
-  <span class="token-str">}'</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Roadmap -->
-    <section id="roadmap" class="section">
-        <div class="container">
-            <div class="section-header">
-                <div class="section-label">Progress</div>
-                <h2 class="section-title">Project Roadmap</h2>
-                <p class="section-desc">Where we are today, and where we are headed.</p>
-            </div>
-            <div class="timeline-wrapper">
-                <div class="timeline-item">
-                    <div class="timeline-marker">
-                        <div class="timeline-dot completed"></div>
-                        <div class="timeline-line"></div>
-                    </div>
-                    <div class="timeline-content">
-                        <h4>Core RAG Pipeline <span class="timeline-tag tag-done">Complete</span></h4>
-                        <div class="timeline-date">May 2026</div>
-                        <p>Hybrid search (dense + sparse), Reciprocal Rank Fusion, Qdrant vector store integration, and end-to-end ingestion pipeline built and tested.</p>
-                    </div>
-                </div>
-                <div class="timeline-item">
-                    <div class="timeline-marker">
-                        <div class="timeline-dot completed"></div>
-                        <div class="timeline-line"></div>
-                    </div>
-                    <div class="timeline-content">
-                        <h4>Advanced Query Orchestrator <span class="timeline-tag tag-done">Complete</span></h4>
-                        <div class="timeline-date">May 2026</div>
-                        <p>Intelligent query routing (Direct / Decompose / HyDE), LLM-based query decomposition, and metadata filter extraction via structured JSON output.</p>
-                    </div>
-                </div>
-                <div class="timeline-item">
-                    <div class="timeline-marker">
-                        <div class="timeline-dot completed"></div>
-                        <div class="timeline-line"></div>
-                    </div>
-                    <div class="timeline-content">
-                        <h4>Initial Ingestion Run <span class="timeline-tag tag-done">Complete</span></h4>
-                        <div class="timeline-date">June 2026</div>
-                        <p>Ingested ~5,600 AI Engineering papers from arXiv via Google Colab notebooks, with embeddings pushed to Qdrant Cloud.</p>
-                    </div>
-                </div>
-                <div class="timeline-item">
-                    <div class="timeline-marker">
-                        <div class="timeline-dot completed"></div>
-                        <div class="timeline-line"></div>
-                    </div>
-                    <div class="timeline-content">
-                        <h4>Public API Release <span class="timeline-tag tag-done">Complete</span></h4>
-                        <div class="timeline-date">June 2026</div>
-                        <p>FastAPI-based streaming endpoint live on Hugging Face Spaces. Developers and AI agents can query the full retrieval pipeline on-demand via SSE.</p>
-                    </div>
-                </div>
-                <div class="timeline-item">
-                    <div class="timeline-marker">
-                        <div class="timeline-dot upcoming"></div>
-                    </div>
-                    <div class="timeline-content">
-                        <h4>Autonomous Agent & Eval Bench <span class="timeline-tag tag-soon">Planned</span></h4>
-                        <div class="timeline-date">Q4 2026</div>
-                        <p>Build an autonomous AI engineering agent powered by this RAG pipeline, alongside a comprehensive evaluation bench specifically for AI engineering tasks.</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Team -->
-    <section id="team" class="section team">
-        <div class="container">
+    <div class="section-bg-offset team-section">
+        <section class="section">
             <div class="section-header">
                 <div class="section-label">The People</div>
                 <h2 class="section-title">Built By</h2>
             </div>
+            
             <div class="team-grid">
                 <div class="team-card">
-                    <div class="team-avatar">AD</div>
-                    <h3>Ayush Dubey</h3>
-                    <div class="team-role">Co-founder & Engineer</div>
-                    <a href="https://www.linkedin.com/in/ayush-dubey-a33156157/" target="_blank" class="linkedin-link">
-                        <svg class="linkedin-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
-                        LinkedIn
+                    <div class="team-avatar avatar-ad">AD</div>
+                    <h3 class="team-name">Ayush Dubey</h3>
+                    <p class="team-role">Co-founder &amp; Engineer</p>
+                    <a href="https://www.linkedin.com/in/ayush-dubey-a33156157/" target="_blank" class="linkedin-link" aria-label="LinkedIn Profile">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/>
+                        </svg>
                     </a>
                 </div>
                 <div class="team-card">
-                    <div class="team-avatar">TD</div>
-                    <h3>Trinetra Devkatte</h3>
-                    <div class="team-role">Co-founder & Engineer</div>
-                    <a href="https://www.linkedin.com/in/trinetra-devkatte-0a792413a/" target="_blank" class="linkedin-link">
-                        <svg class="linkedin-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
-                        LinkedIn
+                    <div class="team-avatar avatar-td">TD</div>
+                    <h3 class="team-name">Trinetra Devkatte</h3>
+                    <p class="team-role">Co-founder &amp; Engineer</p>
+                    <a href="https://www.linkedin.com/in/trinetra-devkatte-0a792413a/" target="_blank" class="linkedin-link" aria-label="LinkedIn Profile">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/>
+                        </svg>
                     </a>
                 </div>
             </div>
-        </div>
-    </section>
+        </section>
+    </div>
 
-    <!-- Footer -->
     <footer class="footer">
-        <div class="container">
-            <div class="footer-inner">
-                <div class="footer-logo">ArXiv Scholar</div>
-                <div class="footer-links">
-                    <a href="https://github.com/Ethereal-Agents/arxiv-scholar" target="_blank">GitHub</a>
-                    <a href="#motivation">About</a>
-                    <a href="#roadmap">Roadmap</a>
-                    <a href="#team">Team</a>
-                    <a href="blog/launching-arxiv-scholar.html">ArXiv Scholar Blog</a>
-                    <a href="blog/launching-nucleus.html">Nucleus Blog</a>
+        <div class="footer-content">
+            <div class="footer-brand">
+                <div class="logo-icon" style="width: 24px; height: 24px; font-size: 0.875rem;">E</div>
+                Ethereal Agents
+            </div>
+            <div class="footer-links">
+                <div class="footer-links-col">
+                    <a href="https://github.com/Ethereal-Agents" target="_blank">GitHub</a>
+                    <a href="#products">Products</a>
+                    <a href="blog/launching-arxiv-scholar.html">Blog</a>
+                </div>
+                <div class="footer-links-col">
+                    <a href="products/arxiv-scholar.html">ArXiv Scholar</a>
+                    <a href="products/nucleus.html">Nucleus</a>
                 </div>
             </div>
-            <div class="footer-copy">
-                &copy; 2026 ArXiv Scholar. Open-source under the MIT License.
-            </div>
+        </div>
+        <div class="footer-bottom">
+            &copy; 2026 Ethereal Agents. Open-source under MIT and 0BSD Licenses.
         </div>
     </footer>
-
-<script>
-function copyCurl() {
-    const cmd = `curl -N -X POST "https://trinetra-dev-arxiv-scholar.hf.space/api/v1/query" \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "query": "What is contrastive learning?",
-    "limit": 5,
-    "use_reranker": false
-  }'`;
-    navigator.clipboard.writeText(cmd).then(() => {
-        const btn = document.getElementById('copy-curl-btn');
-        btn.textContent = 'Copied!';
-        btn.classList.add('copied');
-        setTimeout(() => {
-            btn.textContent = 'Copy';
-            btn.classList.remove('copied');
-        }, 2000);
-    });
-}
-</script>
 
 </body>
 </html>
