@@ -90,7 +90,12 @@
       color: var(--c-text);
       text-decoration: none;
     }
-    .nav-logo span { color: var(--c-accent); }
+    .nav-logo span {
+      color: var(--c-accent);
+      font-family: var(--font-mono);
+      font-size: 18px;
+      margin-right: 2px;
+    }
 
     .nav-links { display: flex; gap: 28px; }
     .nav-links a {
@@ -609,7 +614,7 @@
   <!-- ═══════════════════════════════════════════════════════════════ -->
   <nav>
     <div class="container">
-      <a href="../" class="nav-logo"><span>⬡</span> Agent-1</a>
+      <a href="../" class="nav-logo"><span>❯_</span> Agent-1</a>
       <div class="nav-links">
         <a href="#motivation">Motivation</a>
         <a href="#architecture">Architecture</a>
@@ -632,7 +637,7 @@
       <div class="hero-badge">🧪 Open Source · 0BSD License</div>
       <h1>A Scratch-Built Agent for Measuring Memory</h1>
       <p class="hero-lede">
-        Does cross-session memory actually help coding agents, or does it just feel like it should? We built Agent-1 to find out. It's a minimal ReAct agent with no framework dependencies — every token is tracked, every component is auditable. When we add Nucleus SwarmMemory, the delta is attributable to memory alone.
+        Does cross-session memory actually help coding agents, or does it just feel like it should? We built Agent-1 to find out. It's a minimal ReAct agent with no framework dependencies. Every token is tracked, and every component is auditable. When we add Nucleus SwarmMemory, the delta is attributable to memory alone.
       </p>
 
       <div class="author-pills">
