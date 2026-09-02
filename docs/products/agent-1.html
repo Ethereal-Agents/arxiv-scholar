@@ -680,17 +680,17 @@
       </p>
       
       <p>
-        The landscape of AI coding agents is rich — SWE-Agent, OpenHands, Aider, and dozens of others can resolve real GitHub issues. But they're complex systems: hundreds of heuristics, implicit caching layers, framework-specific context management, custom prompt pipelines. When you add memory on top of one of these agents and see a 30% token reduction, how do you know the improvement came from memory? Maybe a caching layer changed. Maybe the framework updated its retrieval heuristic. The signal drowns in noise.
+        There are plenty of good coding agents out there: SWE-Agent, OpenHands, Aider, and others. They work. But they're also complex. Hundreds of heuristics, implicit caching layers, framework-specific context management. If you bolt memory onto one of these and see a 30% token reduction, what caused it? Was it the memory? A caching change? A framework update? Hard to tell.
       </p>
       <p>
-        We faced this exact problem when evaluating Nucleus SwarmMemory. To prove that shared team memory genuinely reduces token waste and improves resolution rates, we needed three things: (1) Absolute control over the context window — knowing exactly what tokens enter and exit the prompt at every step. (2) Reproducible environments — identical Docker containers with deterministic dependency states. (3) Clean tool interfaces — tools that don't secretly inject hidden context or side-channel information.
+        We hit this problem head-on when evaluating Nucleus SwarmMemory. To trust the numbers, we needed: (1) full control over the context window, so we know exactly what tokens go in and out, (2) reproducible Docker environments with deterministic dependency states, and (3) tools that don't secretly inject hidden context.
       </p>
       <p>
-        So we built Agent-1. It's not trying to be the best coding agent. It's trying to be the most measurable one. Every line of code is auditable, every token is tracked, and the only variable between a baseline run and a memory-augmented run is the presence of Nucleus. What follows is a deep dive into every component — how they work, why they're designed the way they are, and what we learned building them.
+        So we built Agent-1. Not to be the best agent, but to be the most measurable one. Every line of code is ours, every token is tracked, and the only difference between a baseline run and a memory run is Nucleus itself. Here's how it works.
       </p>
 
       <div class="callout callout-info">
-        <p>Think of it like a scientific experiment: Agent-1 is the lab equipment. Nucleus is the treatment. SWE-bench is the test population. We built the equipment from scratch so we could trust the measurement.</p>
+        <p>Think of it like a lab experiment: Agent-1 is the equipment, Nucleus is the treatment, SWE-bench is the test population. We built the equipment ourselves so we could trust the measurement.</p>
       </div>
     </div>
   </section>
@@ -709,7 +709,7 @@
 
       <h3>The ReAct Loop</h3>
       <p>
-        The core of Agent-1 is a ReAct (Reasoning and Acting) loop. The agent thinks, picks a tool to use, observes the result, and repeats. This Reasoning-Acting cycle continues until the task is solved or the step limit is reached.
+        Agent-1 runs a simple loop: think, pick a tool, observe the result, repeat. The model reasons about what to do next, calls a tool (read a file, run a test, edit code), sees the output, and decides the next step. This continues until the task is solved or the agent hits its 200-step limit.
       </p>
       <ul>
         <li>Loop runs <code>while step_count &lt; max_steps (200)</code></li>
@@ -724,42 +724,89 @@
         <li>Four termination conditions: (1) <code>finish</code> tool called, (2) 3 consecutive nudges, (3) max 200 steps, (4) LLM returns empty</li>
       </ul>
 
-      <div style="margin: 36px 0; background: #0e0e12; border: 1px solid var(--c-border); border-radius: var(--r); padding: 24px; text-align: center;">
-        <svg viewBox="0 0 900 480" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <linearGradient id="g-hist" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#4c1d95"/><stop offset="100%" stop-color="#312e81"/></linearGradient>
-              <linearGradient id="g-llm" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#064e3b"/><stop offset="100%" stop-color="#065f46"/></linearGradient>
-              <linearGradient id="g-parse" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#7c2d12"/><stop offset="100%" stop-color="#9a3412"/></linearGradient>
-              <linearGradient id="g-tool" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#831843"/><stop offset="100%" stop-color="#9d174d"/></linearGradient>
-              <linearGradient id="g-comp" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#1e3a8a"/><stop offset="100%" stop-color="#1d4ed8"/></linearGradient>
-              <marker id="arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#a78bfa"/></marker>
-            </defs>
-            <rect x="250" y="40" width="400" height="60" rx="8" fill="url(#g-hist)" stroke="#a78bfa" stroke-width="2"/>
-            <text x="450" y="75" fill="#fff" font-size="16" font-family="monospace" text-anchor="middle" font-weight="bold">Context History</text>
+      <div style="margin: 36px 0; background: #0e0e12; border: 1px solid var(--c-border); border-radius: var(--r); padding: 24px 16px; overflow: hidden;">
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px; padding: 0 8px;">
+          <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--c-accent); box-shadow: 0 0 10px var(--c-accent);"></span>
+          <span style="font-family: var(--font-mono); font-size: 12px; font-weight: 600; color: var(--c-text-dim); text-transform: uppercase; letter-spacing: 1px;">ReAct Loop · Think → Act → Observe</span>
+        </div>
+        <svg viewBox="0 0 900 450" width="100%" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="d1-pur-g" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#a78bfa" stop-opacity="0.2"/><stop offset="100%" stop-color="#4338ca" stop-opacity="0.05"/></linearGradient>
+            <linearGradient id="d1-grn-g" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#10b981" stop-opacity="0.2"/><stop offset="100%" stop-color="#059669" stop-opacity="0.05"/></linearGradient>
+            <linearGradient id="d1-amb-g" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#f59e0b" stop-opacity="0.2"/><stop offset="100%" stop-color="#b45309" stop-opacity="0.05"/></linearGradient>
+            <linearGradient id="d1-pnk-g" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#f472b6" stop-opacity="0.2"/><stop offset="100%" stop-color="#be185d" stop-opacity="0.05"/></linearGradient>
+            <linearGradient id="d1-blu-g" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#3b82f6" stop-opacity="0.2"/><stop offset="100%" stop-color="#1d4ed8" stop-opacity="0.05"/></linearGradient>
+            <marker id="d1-arr" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M1,1 L7,4 L1,7 Z" fill="#71717a"/></marker>
+            <filter id="d1-glow" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="3" result="blur"/><feComposite in="SourceGraphic" in2="blur" operator="over"/></filter>
+          </defs>
 
-            <rect x="650" y="160" width="200" height="60" rx="8" fill="url(#g-llm)" stroke="#34d399" stroke-width="2"/>
-            <text x="750" y="195" fill="#fff" font-size="16" font-family="monospace" text-anchor="middle" font-weight="bold">LLM Service</text>
+          <!-- Path logic -->
+          <path d="M 600,80 L 760,80 L 760,140" stroke="#71717a" stroke-width="2" fill="none" marker-end="url(#d1-arr)"/>
+          <path d="M 760,230 L 760,330 L 680,330" stroke="#71717a" stroke-width="2" fill="none" marker-end="url(#d1-arr)"/>
+          <path d="M 450,330 L 370,330" stroke="#71717a" stroke-width="2" fill="none" marker-end="url(#d1-arr)"/>
+          <path d="M 140,330 L 140,240" stroke="#71717a" stroke-width="2" fill="none" marker-end="url(#d1-arr)"/>
+          <path d="M 140,150 L 140,80 L 290,80" stroke="#71717a" stroke-width="2" fill="none" marker-end="url(#d1-arr)"/>
 
-            <rect x="550" y="320" width="200" height="60" rx="8" fill="url(#g-parse)" stroke="#f59e0b" stroke-width="2"/>
-            <text x="650" y="355" fill="#fff" font-size="16" font-family="monospace" text-anchor="middle" font-weight="bold">Response Parser</text>
+          <!-- Pills on arrows -->
+          <rect x="635" y="70" width="100" height="20" rx="4" fill="#09090b" stroke="#71717a" stroke-width="1"/>
+          <text x="685" y="83" fill="#a1a1aa" font-size="10" font-family="var(--font-mono)" font-weight="700" text-anchor="middle">send messages</text>
 
-            <rect x="150" y="320" width="240" height="60" rx="8" fill="url(#g-tool)" stroke="#f472b6" stroke-width="2"/>
-            <text x="270" y="355" fill="#fff" font-size="16" font-family="monospace" text-anchor="middle" font-weight="bold">Tool Execution / Nudge</text>
+          <rect x="710" y="270" width="100" height="20" rx="4" fill="#09090b" stroke="#71717a" stroke-width="1"/>
+          <text x="760" y="283" fill="#a1a1aa" font-size="10" font-family="var(--font-mono)" font-weight="700" text-anchor="middle">response</text>
 
-            <rect x="50" y="160" width="200" height="60" rx="8" fill="url(#g-comp)" stroke="#60a5fa" stroke-width="2"/>
-            <text x="150" y="195" fill="#fff" font-size="16" font-family="monospace" text-anchor="middle" font-weight="bold">Compact if Needed</text>
+          <rect x="375" y="320" width="70" height="20" rx="4" fill="#09090b" stroke="#71717a" stroke-width="1"/>
+          <text x="410" y="333" fill="#a1a1aa" font-size="10" font-family="var(--font-mono)" font-weight="700" text-anchor="middle">tool calls</text>
 
-            <path d="M 650 70 Q 750 70 750 160" fill="none" stroke="#a78bfa" stroke-width="3" marker-end="url(#arrow)"/>
-            <path d="M 750 220 Q 750 350 750 350 L 750 350" fill="none" stroke="#a78bfa" stroke-width="3" marker-end="url(#arrow)"/>
-            <path d="M 550 350 L 390 350" fill="none" stroke="#a78bfa" stroke-width="3" marker-end="url(#arrow)"/>
-            <path d="M 150 350 Q 150 250 150 220" fill="none" stroke="#a78bfa" stroke-width="3" marker-end="url(#arrow)"/>
-            <path d="M 150 160 Q 150 70 250 70" fill="none" stroke="#a78bfa" stroke-width="3" marker-end="url(#arrow)"/>
+          <rect x="90" y="270" width="100" height="20" rx="4" fill="#09090b" stroke="#71717a" stroke-width="1"/>
+          <text x="140" y="283" fill="#a1a1aa" font-size="10" font-family="var(--font-mono)" font-weight="700" text-anchor="middle">results</text>
+
+          <rect x="190" y="70" width="70" height="20" rx="4" fill="#09090b" stroke="#71717a" stroke-width="1"/>
+          <text x="225" y="83" fill="#a1a1aa" font-size="10" font-family="var(--font-mono)" font-weight="700" text-anchor="middle">append</text>
+
+          <!-- Node 1: Context History (Top Center) -->
+          <rect x="300" y="40" width="300" height="80" rx="10" fill="#141419" stroke="#27272a" stroke-width="1.5" filter="url(#d1-glow)"/>
+          <rect x="300" y="40" width="300" height="32" rx="10" fill="url(#d1-pur-g)"/>
+          <path d="M 300,72 L 600,72" stroke="#27272a" stroke-width="1"/>
+          <text x="450" y="61" fill="#a78bfa" font-size="12" font-weight="700" font-family="var(--font-mono)" text-anchor="middle">CONTEXT HISTORY</text>
+          <text x="450" y="100" fill="#e4e4e7" font-size="12" font-weight="600" text-anchor="middle" font-family="var(--font-sans)">System Prompt + Task Description + Tool Outputs</text>
+
+          <!-- Node 2: LLM Service (Right) -->
+          <rect x="650" y="150" width="220" height="80" rx="10" fill="#141419" stroke="#27272a" stroke-width="1.5"/>
+          <rect x="650" y="150" width="220" height="32" rx="10" fill="url(#d1-grn-g)"/>
+          <path d="M 650,182 L 870,182" stroke="#27272a" stroke-width="1"/>
+          <text x="760" y="171" fill="#10b981" font-size="12" font-weight="700" font-family="var(--font-mono)" text-anchor="middle">LLM SERVICE</text>
+          <text x="760" y="202" fill="#e4e4e7" font-size="11" font-weight="600" text-anchor="middle" font-family="var(--font-sans)">LiteLLM · Prompt Cache</text>
+          <text x="760" y="218" fill="#a1a1aa" font-size="11" font-weight="600" text-anchor="middle" font-family="var(--font-sans)">N-2 Checkpoint</text>
+
+          <!-- Node 3: Response Parser (Bottom Right) -->
+          <rect x="450" y="290" width="230" height="80" rx="10" fill="#141419" stroke="#27272a" stroke-width="1.5"/>
+          <rect x="450" y="290" width="230" height="32" rx="10" fill="url(#d1-amb-g)"/>
+          <path d="M 450,322 L 680,322" stroke="#27272a" stroke-width="1"/>
+          <text x="565" y="311" fill="#f59e0b" font-size="12" font-weight="700" font-family="var(--font-mono)" text-anchor="middle">RESPONSE PARSER</text>
+          <text x="565" y="342" fill="#e4e4e7" font-size="11" font-weight="600" text-anchor="middle" font-family="var(--font-sans)">Extract tool calls</text>
+          <text x="565" y="358" fill="#a1a1aa" font-size="11" font-weight="600" text-anchor="middle" font-family="var(--font-sans)">Detect empty/text-only</text>
+
+          <!-- Node 4: Tool Execution (Bottom Left) -->
+          <rect x="140" y="290" width="230" height="80" rx="10" fill="#141419" stroke="#27272a" stroke-width="1.5"/>
+          <rect x="140" y="290" width="230" height="32" rx="10" fill="url(#d1-pnk-g)"/>
+          <path d="M 140,322 L 370,322" stroke="#27272a" stroke-width="1"/>
+          <text x="255" y="311" fill="#f472b6" font-size="12" font-weight="700" font-family="var(--font-mono)" text-anchor="middle">TOOL EXECUTION</text>
+          <text x="255" y="342" fill="#e4e4e7" font-size="11" font-weight="600" text-anchor="middle" font-family="var(--font-sans)">Registry dispatch</text>
+          <text x="255" y="358" fill="#a1a1aa" font-size="11" font-weight="600" text-anchor="middle" font-family="var(--font-sans)">Or soft-nudge if no tools</text>
+
+          <!-- Node 5: Compact Check (Left) -->
+          <rect x="30" y="150" width="220" height="80" rx="10" fill="#141419" stroke="#27272a" stroke-width="1.5"/>
+          <rect x="30" y="150" width="220" height="32" rx="10" fill="url(#d1-blu-g)"/>
+          <path d="M 30,182 L 250,182" stroke="#27272a" stroke-width="1"/>
+          <text x="140" y="171" fill="#3b82f6" font-size="12" font-weight="700" font-family="var(--font-mono)" text-anchor="middle">COMPACT CHECK</text>
+          <text x="140" y="202" fill="#e4e4e7" font-size="11" font-weight="600" text-anchor="middle" font-family="var(--font-sans)">Tokens &gt; 75%?</text>
+          <text x="140" y="218" fill="#a1a1aa" font-size="11" font-weight="600" text-anchor="middle" font-family="var(--font-sans)">Sawtooth compaction</text>
         </svg>
       </div>
 
       <h3>Sawtooth Context Compaction</h3>
       <p>
-        LLMs have a maximum input size. When the conversation exceeds this, the agent needs to summarize older messages to make room for new ones — like clearing your desk but keeping the most important notes.
+        LLMs have a max input size. Long debugging sessions can blow past it. When the conversation gets too long, Agent-1 summarizes the middle portion while keeping the beginning (system prompt + task) and the recent tail intact.
       </p>
       <ul>
         <li>Triggered when <code>current_tokens > 75% of max_input_tokens</code> (fallback: 100,000 tokens)</li>
@@ -770,27 +817,54 @@
         <li>Why "Sawtooth": Token count rises linearly with each step, then drops sharply on compaction, then rises again — creating a sawtooth waveform over time</li>
       </ul>
 
-      <div style="margin: 36px 0; background: #0e0e12; border: 1px solid var(--c-border); border-radius: var(--r); padding: 24px;">
-        <svg viewBox="0 0 860 280" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
-          <line x1="50" y1="40" x2="800" y2="40" stroke="#a1a1aa" stroke-dasharray="5,5" stroke-width="2"/>
-          <text x="650" y="30" fill="#a1a1aa" font-size="12">Compaction Threshold (75%)</text>
+      <div style="margin: 36px 0; background: #0e0e12; border: 1px solid var(--c-border); border-radius: var(--r); padding: 24px 16px; overflow: hidden;">
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px; padding: 0 8px;">
+          <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--c-accent); box-shadow: 0 0 10px var(--c-accent);"></span>
+          <span style="font-family: var(--font-mono); font-size: 12px; font-weight: 600; color: var(--c-text-dim); text-transform: uppercase; letter-spacing: 1px;">Sawtooth Compaction · Token Count Over Time</span>
+        </div>
+        <svg viewBox="0 0 860 300" width="100%" xmlns="http://www.w3.org/2000/svg">
+          <line x1="80" y1="260" x2="800" y2="260" stroke="#3f3f46" stroke-width="2"/>
+          <line x1="80" y1="40" x2="80" y2="260" stroke="#3f3f46" stroke-width="2"/>
           
-          <path d="M 50 240 L 250 40 L 250 180 L 500 40 L 500 160 L 750 40" fill="none" stroke="#a78bfa" stroke-width="3"/>
-          <circle cx="250" cy="40" r="5" fill="#f87171"/>
-          <circle cx="500" cy="40" r="5" fill="#f87171"/>
-          <circle cx="250" cy="180" r="5" fill="#34d399"/>
+          <line x1="80" y1="180" x2="800" y2="180" stroke="#1a1a1f" stroke-width="1"/>
+          <line x1="80" y1="100" x2="800" y2="100" stroke="#1a1a1f" stroke-width="1"/>
+
+          <line x1="80" y1="60" x2="800" y2="60" stroke="#a1a1aa" stroke-dasharray="5,5" stroke-width="2"/>
+          <text x="800" y="50" fill="#a1a1aa" font-size="12" font-family="var(--font-sans)" text-anchor="end">Compaction Threshold (75%)</text>
           
-          <text x="270" y="200" fill="#a1a1aa" font-size="12">Middle → Summary</text>
+          <text x="440" y="290" fill="#a1a1aa" font-size="14" font-family="var(--font-sans)" text-anchor="middle">Agent Steps</text>
+          <text x="30" y="150" fill="#a1a1aa" font-size="14" font-family="var(--font-sans)" text-anchor="middle" transform="rotate(-90 30 150)">Token Count</text>
           
-          <line x1="50" y1="40" x2="50" y2="240" stroke="#3f3f46" stroke-width="2"/>
-          <line x1="50" y1="240" x2="800" y2="240" stroke="#3f3f46" stroke-width="2"/>
-          <text x="400" y="270" fill="#a1a1aa" font-size="14">Agent Steps</text>
+          <path d="M 80 240 L 250 60 L 250 160 L 500 60 L 500 160 L 750 60 L 750 160 L 800 120" fill="none" stroke="#a78bfa" stroke-width="3"/>
+          
+          <circle cx="250" cy="60" r="5" fill="#ef4444"/>
+          <rect x="255" y="45" width="60" height="16" rx="4" fill="#09090b" stroke="#ef4444" stroke-width="1"/>
+          <text x="285" y="56" fill="#ef4444" font-size="9" font-family="var(--font-mono)" text-anchor="middle" font-weight="bold">compact</text>
+
+          <circle cx="250" cy="160" r="5" fill="#22c55e"/>
+
+          <circle cx="500" cy="60" r="5" fill="#ef4444"/>
+          <rect x="505" y="45" width="60" height="16" rx="4" fill="#09090b" stroke="#ef4444" stroke-width="1"/>
+          <text x="535" y="56" fill="#ef4444" font-size="9" font-family="var(--font-mono)" text-anchor="middle" font-weight="bold">compact</text>
+          
+          <circle cx="500" cy="160" r="5" fill="#22c55e"/>
+
+          <circle cx="750" cy="60" r="5" fill="#ef4444"/>
+          <rect x="755" y="45" width="60" height="16" rx="4" fill="#09090b" stroke="#ef4444" stroke-width="1"/>
+          <text x="785" y="56" fill="#ef4444" font-size="9" font-family="var(--font-mono)" text-anchor="middle" font-weight="bold">compact</text>
+
+          <circle cx="750" cy="160" r="5" fill="#22c55e"/>
+          
+          <text x="270" y="165" fill="#a1a1aa" font-size="11" font-family="var(--font-sans)">Head + Summary + Tail</text>
+          
+          <path d="M 280 180 Q 375 140 450 100" fill="none" stroke="#71717a" stroke-dasharray="2,2"/>
+          <text x="365" y="130" fill="#71717a" font-size="11" font-family="var(--font-sans)">linear growth</text>
         </svg>
       </div>
 
       <h3>Sliding-Window Prompt Caching</h3>
       <p>
-        Every time the agent calls the LLM, it sends the entire conversation history. Most of this history hasn't changed since the last call. Prompt caching tells the LLM: 'I'm marking a checkpoint — everything before this point is the same as last time, so reuse your cached computation.' This dramatically cuts latency and cost.
+        Each LLM call sends the full conversation history, but most of it hasn't changed since the last call. By placing a cache checkpoint at the second-to-last message (N−2), the LLM reuses its cached computation for everything before that point. Only the newest exchange gets reprocessed. This cuts latency and cost significantly on long runs.
       </p>
       <ul>
         <li>When <code>len(messages) ≥ 4</code>, the N−2 message (second-to-last) gets <code>{"cache_control": {"type": "ephemeral"}}</code></li>
@@ -823,7 +897,7 @@ if len(messages) >= 4:
   <!-- ═══════════════════════════════════════════════════════════════ -->
   <section id="tools">
     <div class="container-narrow">
-      <h2>Precise Instruments, Not Swiss Army Knives</h2>
+      <h2>The Toolset</h2>
       <p class="section-subtitle">
         Six tools, each designed for correctness and token efficiency.
       </p>
@@ -903,7 +977,7 @@ if path.endswith('.py'):
       </ul>
 
       <div class="callout callout-info">
-        <p>The environment doesn't just run commands — it teaches the agent about itself. By injecting runtime-specific instructions directly into the system prompt, the agent never makes incorrect assumptions about its execution context.</p>
+        <p>The environment injects its own instructions into the system prompt. In Docker, it tells the agent to use absolute paths. On macOS, it warns about local constraints. This way the agent never guesses wrong about where it's running.</p>
       </div>
     </div>
   </section>
@@ -936,41 +1010,76 @@ if path.endswith('.py'):
         <li>Git history sanitization: strips ticket refs from commit messages to prevent information leakage</li>
       </ul>
 
-      <div style="margin: 36px 0; background: #0e0e12; border: 1px solid var(--c-border); border-radius: var(--r); padding: 24px; text-align: center;">
-        <svg viewBox="0 0 900 420" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+      <div style="margin: 36px 0; background: #0e0e12; border: 1px solid var(--c-border); border-radius: var(--r); padding: 24px 16px; overflow: hidden;">
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px; padding: 0 8px;">
+          <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--c-accent); box-shadow: 0 0 10px var(--c-accent);"></span>
+          <span style="font-family: var(--font-mono); font-size: 12px; font-weight: 600; color: var(--c-text-dim); text-transform: uppercase; letter-spacing: 1px;">Evaluation Pipeline · Inference → Grading</span>
+        </div>
+        <svg viewBox="0 0 900 400" width="100%" xmlns="http://www.w3.org/2000/svg">
           <defs>
-            <linearGradient id="g-cont" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#4f46e5"/><stop offset="100%" stop-color="#312e81"/></linearGradient>
-            <linearGradient id="g-grad" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#10b981"/><stop offset="100%" stop-color="#047857"/></linearGradient>
-            <marker id="arr" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#a78bfa"/></marker>
+            <linearGradient id="d3-ind-g" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#4f46e5" stop-opacity="0.2"/><stop offset="100%" stop-color="#312e81" stop-opacity="0.05"/></linearGradient>
+            <linearGradient id="d3-grn-g" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#10b981" stop-opacity="0.2"/><stop offset="100%" stop-color="#047857" stop-opacity="0.05"/></linearGradient>
+            <marker id="d3-arr" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M1,1 L7,4 L1,7 Z" fill="#71717a"/></marker>
           </defs>
-          
-          <rect x="100" y="40" width="120" height="60" rx="8" fill="url(#g-cont)" stroke="#a78bfa"/>
-          <text x="160" y="75" fill="#fff" font-size="14" font-family="monospace" text-anchor="middle">Instance 1</text>
-          
-          <rect x="250" y="40" width="120" height="60" rx="8" fill="url(#g-cont)" stroke="#a78bfa"/>
-          <text x="310" y="75" fill="#fff" font-size="14" font-family="monospace" text-anchor="middle">Instance 2</text>
-          
-          <rect x="400" y="40" width="120" height="60" rx="8" fill="url(#g-cont)" stroke="#a78bfa"/>
-          <text x="460" y="75" fill="#fff" font-size="14" font-family="monospace" text-anchor="middle">Instance 3</text>
-          
-          <text x="580" y="75" fill="#a78bfa" font-size="24" font-weight="bold">...</text>
 
-          <rect x="250" y="160" width="400" height="50" rx="8" fill="#1e1e2e" stroke="#6366f1"/>
-          <text x="450" y="190" fill="#fff" font-size="14" font-family="monospace" text-anchor="middle">predictions.jsonl</text>
+          <!-- Row 1: Containers -->
+          <rect x="50" y="40" width="160" height="70" rx="10" fill="#141419" stroke="#27272a" stroke-width="1.5"/>
+          <rect x="50" y="40" width="160" height="24" rx="10" fill="url(#d3-ind-g)"/>
+          <path d="M 50,64 L 210,64" stroke="#27272a" stroke-width="1"/>
+          <text x="130" y="56" fill="#818cf8" font-size="11" font-weight="700" font-family="var(--font-mono)" text-anchor="middle">CONTAINER 1</text>
+          <text x="130" y="82" fill="#e4e4e7" font-size="11" font-family="var(--font-sans)" text-anchor="middle">Agent run</text>
+          <text x="130" y="98" fill="#a1a1aa" font-size="11" font-family="var(--font-sans)" text-anchor="middle">Docker isolate</text>
+
+          <rect x="230" y="40" width="160" height="70" rx="10" fill="#141419" stroke="#27272a" stroke-width="1.5"/>
+          <rect x="230" y="40" width="160" height="24" rx="10" fill="url(#d3-ind-g)"/>
+          <path d="M 230,64 L 390,64" stroke="#27272a" stroke-width="1"/>
+          <text x="310" y="56" fill="#818cf8" font-size="11" font-weight="700" font-family="var(--font-mono)" text-anchor="middle">CONTAINER 2</text>
+          <text x="310" y="82" fill="#e4e4e7" font-size="11" font-family="var(--font-sans)" text-anchor="middle">Agent run</text>
+          <text x="310" y="98" fill="#a1a1aa" font-size="11" font-family="var(--font-sans)" text-anchor="middle">Docker isolate</text>
+
+          <rect x="410" y="40" width="160" height="70" rx="10" fill="#141419" stroke="#27272a" stroke-width="1.5"/>
+          <rect x="410" y="40" width="160" height="24" rx="10" fill="url(#d3-ind-g)"/>
+          <path d="M 410,64 L 570,64" stroke="#27272a" stroke-width="1"/>
+          <text x="490" y="56" fill="#818cf8" font-size="11" font-weight="700" font-family="var(--font-mono)" text-anchor="middle">CONTAINER 3</text>
+          <text x="490" y="82" fill="#e4e4e7" font-size="11" font-family="var(--font-sans)" text-anchor="middle">Agent run</text>
+          <text x="490" y="98" fill="#a1a1aa" font-size="11" font-family="var(--font-sans)" text-anchor="middle">Docker isolate</text>
+
+          <rect x="590" y="40" width="160" height="70" rx="10" fill="#141419" stroke="#27272a" stroke-width="1.5"/>
+          <rect x="590" y="40" width="160" height="24" rx="10" fill="url(#d3-ind-g)"/>
+          <path d="M 590,64 L 750,64" stroke="#27272a" stroke-width="1"/>
+          <text x="670" y="56" fill="#818cf8" font-size="11" font-weight="700" font-family="var(--font-mono)" text-anchor="middle">...</text>
+          <text x="670" y="82" fill="#e4e4e7" font-size="11" font-family="var(--font-sans)" text-anchor="middle">Agent run</text>
+          <text x="670" y="98" fill="#a1a1aa" font-size="11" font-family="var(--font-sans)" text-anchor="middle">Docker isolate</text>
+
+          <!-- Middle: predictions.jsonl -->
+          <rect x="200" y="180" width="400" height="50" rx="10" fill="#141419" stroke="#4f46e5" stroke-width="1.5"/>
+          <text x="400" y="210" fill="#e4e4e7" font-size="14" font-family="var(--font-mono)" text-anchor="middle" font-weight="bold">predictions.jsonl</text>
           
-          <path d="M 160 100 L 160 130 L 450 130 L 450 160" fill="none" stroke="#a78bfa" stroke-width="2" marker-end="url(#arr)"/>
-          <path d="M 310 100 L 310 130 L 450 130" fill="none" stroke="#a78bfa" stroke-width="2"/>
-          <path d="M 460 100 L 460 130 L 450 130" fill="none" stroke="#a78bfa" stroke-width="2"/>
+          <path d="M 130 110 L 130 145 L 400 145 L 400 180" fill="none" stroke="#71717a" stroke-width="2" marker-end="url(#d3-arr)"/>
+          <path d="M 310 110 L 310 145 L 400 145" fill="none" stroke="#71717a" stroke-width="2"/>
+          <path d="M 490 110 L 490 145 L 400 145" fill="none" stroke="#71717a" stroke-width="2"/>
+          <path d="M 670 110 L 670 145 L 400 145" fill="none" stroke="#71717a" stroke-width="2"/>
+
+          <rect x="360" y="135" width="80" height="20" rx="4" fill="#09090b" stroke="#71717a" stroke-width="1"/>
+          <text x="400" y="148" fill="#a1a1aa" font-size="10" font-family="var(--font-mono)" font-weight="700" text-anchor="middle">patches</text>
+
+          <!-- Bottom: SWE-bench Grader -->
+          <rect x="250" y="270" width="300" height="50" rx="10" fill="#141419" stroke="#27272a" stroke-width="1.5"/>
+          <rect x="250" y="270" width="300" height="24" rx="10" fill="url(#d3-grn-g)"/>
+          <path d="M 250,294 L 550,294" stroke="#27272a" stroke-width="1"/>
+          <text x="400" y="286" fill="#10b981" font-size="11" font-weight="700" font-family="var(--font-mono)" text-anchor="middle">SWE-BENCH GRADER</text>
+
+          <path d="M 400 230 L 400 270" fill="none" stroke="#71717a" stroke-width="2" marker-end="url(#d3-arr)"/>
+          <rect x="370" y="240" width="60" height="20" rx="4" fill="#09090b" stroke="#71717a" stroke-width="1"/>
+          <text x="400" y="253" fill="#a1a1aa" font-size="10" font-family="var(--font-mono)" font-weight="700" text-anchor="middle">grade</text>
           
-          <rect x="350" y="270" width="200" height="60" rx="8" fill="url(#g-grad)" stroke="#34d399"/>
-          <text x="450" y="305" fill="#fff" font-size="16" font-family="monospace" text-anchor="middle" font-weight="bold">SWE-bench Grader</text>
+          <!-- Final: Grade Report -->
+          <rect x="300" y="360" width="200" height="30" rx="8" fill="#141419" stroke="#f59e0b" stroke-width="1.5"/>
+          <text x="400" y="380" fill="#f59e0b" font-size="13" font-family="var(--font-mono)" text-anchor="middle" font-weight="bold">Grade Report</text>
           
-          <path d="M 450 210 L 450 270" fill="none" stroke="#a78bfa" stroke-width="2" marker-end="url(#arr)"/>
-          
-          <rect x="350" y="370" width="200" height="40" rx="8" fill="#1e1e2e" stroke="#f59e0b"/>
-          <text x="450" y="395" fill="#fff" font-size="14" font-family="monospace" text-anchor="middle">Grade Report</text>
-          
-          <path d="M 450 330 L 450 370" fill="none" stroke="#a78bfa" stroke-width="2" marker-end="url(#arr)"/>
+          <path d="M 400 320 L 400 360" fill="none" stroke="#71717a" stroke-width="2" marker-end="url(#d3-arr)"/>
+          <rect x="365" y="330" width="70" height="20" rx="4" fill="#09090b" stroke="#71717a" stroke-width="1"/>
+          <text x="400" y="343" fill="#a1a1aa" font-size="10" font-family="var(--font-mono)" font-weight="700" text-anchor="middle">report</text>
         </svg>
       </div>
 
@@ -980,7 +1089,7 @@ if path.endswith('.py'):
       </p>
 
       <div class="callout callout-info">
-        <p>The Trajectory Viewer isn't just a debugging tool — it's Agent-1's primary feedback loop. Every major improvement to the system prompts and tool designs came from reading trajectory post-mortems and asking: where did the agent waste tokens?</p>
+        <p>The Trajectory Viewer turned out to be our most useful tool. Every major improvement to system prompts and tool designs came from reading post-mortems and spotting where the agent wasted tokens.</p>
       </div>
     </div>
   </section>
@@ -1008,20 +1117,6 @@ if path.endswith('.py'):
         <li><code>memory</code>: Full MCP integration. Agent reads facts at start, writes facts during execution.</li>
       </ul>
       <p>Lifecycle:</p>
-      <ol>
-        <li><code>begin_run()</code> → calls <code>memory_begin_run</code> on Nucleus MCP server → receives <code>run_id</code></li>
-        <li>During execution → agent uses <code>memory_write</code> to record facts with <code>content</code>, <code>fact_type</code> (insight/gotcha/convention/architecture), <code>confidence</code>, <code>scope</code></li>
-        <li><code>end_run()</code> → calls <code>memory_end_run</code> with run_id, token counts, cost</li>
-      </ol>
-
-      <h3>Memory Tools</h3>
-      <ul>
-        <li><code>team_memory_search</code>: queries Nucleus for relevant historical facts from previous runs</li>
-        <li><code>memory_write</code>: records structural findings — fields: content, fact_type, confidence, scope, supersedes_hint</li>
-      </ul>
-
-      <h3>The Dual-Agent Cluster Workflow</h3>
-      <p>For each task in a cluster:</p>
       <ol>
         <li><strong>Diff Researcher</strong> (50 steps) — runs <code>git diff</code> between commits, traces caller/callee chains, writes facts to Nucleus. Motto: "WRITE EARLY, WRITE OFTEN"</li>
         <li><strong>Container Reset</strong> — environment reset to clean state</li>
@@ -1055,82 +1150,61 @@ if path.endswith('.py'):
           </defs>
 
           <!-- ══ NUCLEUS HUB (top center) ══ -->
-          <rect x="310" y="20" width="280" height="100" rx="12" fill="url(#hub-g)" stroke="#a78bfa" stroke-width="2" filter="url(#glow)"/>
-          <text x="450" y="52" fill="#e4e4e7" font-size="15" font-weight="800" text-anchor="middle" font-family="var(--font-sans)">⬡ Nucleus SwarmMemory Hub</text>
-          <rect x="370" y="65" width="160" height="24" rx="4" fill="rgba(167, 139, 250, 0.15)" stroke="#a78bfa" stroke-width="0.8"/>
-          <text x="450" y="82" fill="#a78bfa" font-size="10" font-weight="600" text-anchor="middle" font-family="var(--font-mono)">SQLite · MCP SSE · Facts</text>
-          <text x="450" y="108" fill="#71717a" font-size="10" text-anchor="middle" font-family="var(--font-mono)">insights · gotchas · conventions</text>
+          <rect x="250" y="20" width="400" height="90" rx="12" fill="url(#hub-g)" stroke="#a78bfa" stroke-width="2" filter="url(#glow)"/>
+          <text x="450" y="47" fill="#e4e4e7" font-size="15" font-weight="800" text-anchor="middle" font-family="var(--font-sans)">⬡ Nucleus SwarmMemory Hub</text>
+          <rect x="370" y="58" width="160" height="24" rx="4" fill="rgba(167, 139, 250, 0.15)" stroke="#a78bfa" stroke-width="0.8"/>
+          <text x="450" y="75" fill="#a78bfa" font-size="10" font-weight="600" text-anchor="middle" font-family="var(--font-mono)">SQLite · MCP SSE · Facts</text>
+          <text x="450" y="98" fill="#71717a" font-size="10" text-anchor="middle" font-family="var(--font-mono)">insights · gotchas · conventions</text>
 
           <!-- ══ STAGE 1: DIFF RESEARCHER (left) ══ -->
-          <rect x="40" y="180" width="240" height="160" rx="10" fill="#141419" stroke="#27272a" stroke-width="1.5"/>
-          <rect x="40" y="180" width="240" height="32" rx="10" fill="url(#diff-g)"/>
-          <path d="M40,212 L280,212" stroke="#27272a" stroke-width="1"/>
-          <text x="56" y="202" fill="#34d399" font-size="11" font-weight="700" font-family="var(--font-mono)">STAGE 1 · DIFF RESEARCHER</text>
+          <rect x="30" y="200" width="280" height="160" rx="10" fill="#141419" stroke="#27272a" stroke-width="1.5"/>
+          <rect x="30" y="200" width="280" height="32" rx="10" fill="url(#diff-g)"/>
+          <path d="M30,232 L310,232" stroke="#27272a" stroke-width="1"/>
+          <text x="46" y="222" fill="#34d399" font-size="11" font-weight="700" font-family="var(--font-mono)">STAGE 1 · DIFF RESEARCHER</text>
 
-          <text x="56" y="238" fill="#e4e4e7" font-size="13" font-weight="600">🔬 Analyze upstream changes</text>
-          <text x="56" y="258" fill="#a1a1aa" font-size="11">• git diff between base commits</text>
-          <text x="56" y="276" fill="#a1a1aa" font-size="11">• Trace caller/callee chains</text>
-          <text x="56" y="294" fill="#a1a1aa" font-size="11">• Record facts to Nucleus</text>
-          <rect x="56" y="306" width="80" height="20" rx="4" fill="rgba(52, 211, 153, 0.12)"/>
-          <text x="64" y="320" fill="#34d399" font-size="10" font-weight="600" font-family="var(--font-mono)">50 steps</text>
+          <text x="46" y="258" fill="#e4e4e7" font-size="13" font-weight="600">🔬 Analyze upstream changes</text>
+          <text x="46" y="278" fill="#a1a1aa" font-size="11">• git diff between base commits</text>
+          <text x="46" y="296" fill="#a1a1aa" font-size="11">• Trace caller/callee chains</text>
+          <text x="46" y="314" fill="#a1a1aa" font-size="11">• Record facts to Nucleus</text>
+          <rect x="46" y="326" width="80" height="20" rx="4" fill="rgba(52, 211, 153, 0.12)"/>
+          <text x="54" y="340" fill="#34d399" font-size="10" font-weight="600" font-family="var(--font-mono)">50 steps</text>
 
           <!-- Arrow: Researcher → Hub (write facts) -->
-          <path d="M160,180 L160,145 L305,145 L305,70 L310,70" stroke="#34d399" stroke-width="2" fill="none" marker-end="url(#a-grn)"/>
-          <rect x="170" y="138" width="80" height="18" rx="4" fill="#09090b" stroke="#34d399" stroke-width="1"/>
-          <text x="178" y="151" fill="#34d399" font-size="9.5" font-family="var(--font-mono)" font-weight="700">write facts</text>
+          <path d="M170,200 L170,65 L250,65" stroke="#34d399" stroke-width="2" fill="none" marker-end="url(#a-grn)"/>
+          <rect x="180" y="56" width="60" height="18" rx="4" fill="#09090b" stroke="#34d399" stroke-width="1"/>
+          <text x="210" y="69" fill="#34d399" font-size="9.5" font-family="var(--font-mono)" font-weight="700" text-anchor="middle">write facts</text>
 
           <!-- ══ CONTAINER RESET (center divider) ══ -->
-          <line x1="370" y1="160" x2="370" y2="370" stroke="#f59e0b" stroke-dasharray="6,4" stroke-width="2"/>
-          <rect x="340" y="370" width="120" height="24" rx="4" fill="rgba(245, 158, 11, 0.1)" stroke="#f59e0b" stroke-width="1"/>
-          <text x="400" y="386" fill="#f59e0b" font-size="10" font-weight="700" text-anchor="middle" font-family="var(--font-mono)">CONTAINER RESET</text>
+          <line x1="450" y1="160" x2="450" y2="380" stroke="#f59e0b" stroke-dasharray="6,4" stroke-width="2"/>
+          <rect x="390" y="383" width="120" height="24" rx="4" fill="rgba(245, 158, 11, 0.1)" stroke="#f59e0b" stroke-width="1"/>
+          <text x="450" y="399" fill="#f59e0b" font-size="10" font-weight="700" text-anchor="middle" font-family="var(--font-mono)">CONTAINER RESET</text>
 
           <!-- ══ STAGE 2: EXECUTION AGENT (right) ══ -->
-          <rect x="460" y="180" width="240" height="160" rx="10" fill="#141419" stroke="#27272a" stroke-width="1.5"/>
-          <rect x="460" y="180" width="240" height="32" rx="10" fill="url(#exec-g)"/>
-          <path d="M460,212 L700,212" stroke="#27272a" stroke-width="1"/>
-          <text x="476" y="202" fill="#60a5fa" font-size="11" font-weight="700" font-family="var(--font-mono)">STAGE 2 · EXECUTION AGENT</text>
+          <rect x="590" y="200" width="280" height="160" rx="10" fill="#141419" stroke="#27272a" stroke-width="1.5"/>
+          <rect x="590" y="200" width="280" height="32" rx="10" fill="url(#exec-g)"/>
+          <path d="M590,232 L870,232" stroke="#27272a" stroke-width="1"/>
+          <text x="606" y="222" fill="#60a5fa" font-size="11" font-weight="700" font-family="var(--font-mono)">STAGE 2 · EXECUTION AGENT</text>
 
-          <text x="476" y="238" fill="#e4e4e7" font-size="13" font-weight="600">🤖 Solve the issue</text>
-          <text x="476" y="258" fill="#a1a1aa" font-size="11">• Retrieve facts via memory_search</text>
-          <text x="476" y="276" fill="#a1a1aa" font-size="11">• Read, edit, test, iterate</text>
-          <text x="476" y="294" fill="#a1a1aa" font-size="11">• Generate fix.patch on finish</text>
-          <rect x="476" y="306" width="90" height="20" rx="4" fill="rgba(96, 165, 250, 0.12)"/>
-          <text x="484" y="320" fill="#60a5fa" font-size="10" font-weight="600" font-family="var(--font-mono)">200 steps</text>
+          <text x="606" y="258" fill="#e4e4e7" font-size="13" font-weight="600">🤖 Solve the issue</text>
+          <text x="606" y="278" fill="#a1a1aa" font-size="11">• Retrieve facts via memory_search</text>
+          <text x="606" y="296" fill="#a1a1aa" font-size="11">• Read, edit, test, iterate</text>
+          <text x="606" y="314" fill="#a1a1aa" font-size="11">• Generate fix.patch on finish</text>
+          <rect x="606" y="326" width="90" height="20" rx="4" fill="rgba(96, 165, 250, 0.12)"/>
+          <text x="614" y="340" fill="#60a5fa" font-size="10" font-weight="600" font-family="var(--font-mono)">200 steps</text>
 
           <!-- Arrow: Hub → Executor (read facts) -->
-          <path d="M590,70 L595,70 L595,145 L740,145 L740,180" stroke="#60a5fa" stroke-width="2" fill="none" marker-end="url(#a-blu)"/>
-          <rect x="620" y="138" width="80" height="18" rx="4" fill="#09090b" stroke="#60a5fa" stroke-width="1"/>
-          <text x="630" y="151" fill="#60a5fa" font-size="9.5" font-family="var(--font-mono)" font-weight="700">read facts</text>
-
-          <!-- ══ No write-back arrow from Execution Agent ══ -->
-          <!-- Execution agent does NOT write facts — only the Diff Researcher does -->
+          <path d="M650,65 L730,65 L730,200" stroke="#60a5fa" stroke-width="2" fill="none" marker-end="url(#a-blu)"/>
+          <rect x="660" y="56" width="60" height="18" rx="4" fill="#09090b" stroke="#60a5fa" stroke-width="1"/>
+          <text x="690" y="69" fill="#60a5fa" font-size="9.5" font-family="var(--font-mono)" font-weight="700" text-anchor="middle">read facts</text>
 
           <!-- Read-only label on executor -->
-          <rect x="598" y="306" width="90" height="20" rx="4" fill="rgba(245, 158, 11, 0.12)"/>
-          <text x="606" y="320" fill="#f59e0b" font-size="10" font-weight="600" font-family="var(--font-mono)">read-only</text>
+          <rect x="738" y="326" width="90" height="20" rx="4" fill="rgba(245, 158, 11, 0.12)"/>
+          <text x="746" y="340" fill="#f59e0b" font-size="10" font-weight="600" font-family="var(--font-mono)">read-only</text>
 
           <!-- Timeline arrow at bottom -->
-          <path d="M70,365 L830,365" stroke="#3f3f46" stroke-width="1.5" marker-end="url(#a-pur)"/>
-          <text x="830" y="385" fill="#71717a" font-size="11" text-anchor="end" font-family="var(--font-mono)">time →</text>
+          <path d="M60,380 L860,380" stroke="#3f3f46" stroke-width="1.5" marker-end="url(#a-pur)"/>
+          <text x="860" y="370" fill="#71717a" font-size="11" text-anchor="end" font-family="var(--font-mono)">time →</text>
         </svg>
-      </div>
-
-      <div class="pipeline" style="margin-top: 20px;">
-        <div class="pipeline-step">
-          <div class="pipeline-num">01</div>
-          <div class="pipeline-label">Diff Researcher</div>
-          <div class="pipeline-detail">50 steps · writes facts</div>
-        </div>
-        <div class="pipeline-step">
-          <div class="pipeline-num">02</div>
-          <div class="pipeline-label">Container Reset</div>
-          <div class="pipeline-detail">Clean state</div>
-        </div>
-        <div class="pipeline-step">
-          <div class="pipeline-num">03</div>
-          <div class="pipeline-label">Execution Agent</div>
-          <div class="pipeline-detail">200 steps · reads facts</div>
-        </div>
       </div>
 
     </div>
@@ -1150,7 +1224,7 @@ if path.endswith('.py'):
 
       <h3>Base Agent Capability</h3>
       <p>
-        We ran Agent-1 against 99 instances from SWE-bench Verified using MiMo v2.5 Pro. The automated grader reported a 55.6% pass rate. But automated graders aren't perfect — they can miss correct patches (false negatives) and accept flawed ones (false positives). We analyzed every trajectory and log file to get accurate numbers.
+        We ran Agent-1 on 99 SWE-bench Verified instances with MiMo v2.5 Pro. The automated grader said 55.6%. But graders aren't perfect — they miss correct patches and sometimes accept broken ones. So we analyzed every trajectory and log file manually to get the real numbers.
       </p>
 
       <div class="result-cards">
